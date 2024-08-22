@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <!-- Required meta tags -->
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+        <title>Edit</title>
+        <!-- plugins:css -->
+        <link rel="stylesheet" href="{{url_for('static', filename='vendors/feather/feather.css')}}">
+        <link rel="stylesheet" href="{{url_for('static', filename='vendors/ti-icons/css/themify-icons.css')}}">
+        <link rel="stylesheet" href="{{url_for('static', filename='vendors/css/vendor.bundle.base.css')}}">
+        <link rel="stylesheet" href="{{url_for('static', filename='vendors/mdi/css/materialdesignicons.min.css')}}">
+        <link rel="stylesheet" href="{{url_for('static', filename='vendors/font-awesome/css/font-awesome.min.css')}}">
+        <!-- endinject -->
+        <!-- Plugin css for this page -->
+        <!-- <link rel="stylesheet" href="assets/vendors/datatables.net-bs4/dataTables.bootstrap4.css"> -->
+        <link rel="stylesheet" href="{{url_for('static', filename='vendors/datatables.net-bs5/dataTables.bootstrap5.css')}}">
+        <link rel="stylesheet" href="{{url_for('static', filename='vendors/select2/select2.min.css')}}">
+        <link rel="stylesheet" href="{{url_for('static', filename='vendors/select2-bootstrap-theme/select2-bootstrap.min.css')}}">
+        <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='js/select.dataTables.min.css')}}">
+        <!-- End plugin css for this page -->
+        <!-- inject:css -->
+        <link rel="stylesheet" href="{{url_for('static', filename='css/style.css')}}">
+        <!-- endinject -->
+        <link rel="shortcut icon" href="{{url_for('static', filename='images/logo.svg')}}" />
+    </head>
+    <body>
+        <div class="container-scroll">
+            {% include '/partials/navbar.html' %}
+            <div class="container-fluid page-body-wrapper">
+                {% include '/partials/sidebar.html' %}
+                <div class="main-panel">
+                    <div class="content-wrapper">
+                        <form class="forms-sample" method="POST" action="{{ url_for('edit', haproxy_name=haproxy_name) }}">
+                            <div class="row">
+                                <div class="col-12 grid-margin stretch-card">
+                                    <div class="card">
+                                    <div class="card-body">
+                                        <h4 class="card-title"><i class="mdi mdi-web"></i>Update configuration</h4>
+                                        <div class="form-group">
+                                            <label for="exampleInputName1">Haproxy Name</label>
+                                            <input type="text" class="form-control" id="exampleInputName1" placeholder="Haproxy Name" name="haproxy_name" value="{{ haproxy_name }}" required>
+                                        </div>
+                                        <div class="form-group">
+                                            <div class="col">
+                                                <label for="exampleFormControlSelect4">Protocol</label>
+                                                <select class="form-select form-select-sm" id="exampleFormControlSelect4" name="protocol" id="protocol" onchange="protocolFunction()">
+                                                <option value="" disabled selected>--Select protocol--</option>
+                                                <option value="http" {% if protocol == 'http' %}selected{% endif %}>HTTP</option>
+                                                <option value="tcp" {% if protocol == 'tcp' %}selected{% endif %}>TCP</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="protocol_http" id="protocol_http" style="display: none;">
+                                            <div class="form-group">
+                                                <div class="form-check">
+                                                    <label class="form-check-label">
+                                                    <i class="mdi mdi-lock"></i><input type="checkbox" class="form-check-input" id="ssl_checkbox_http" name="ssl_checkbox"> Use SSL Certificate </label>
+                                                </div>
+                                            </div>
+                                            <div class="form-group" style="display: none;" id="ssl_fields_http">
+                                                <label for="exampleInputSSLHTTP">SSL Certificate Path:</label>
+                                                <input type="text" id="exampleInputSSLHTTP" class="form-control" name="ssl_cert_path" value="{{ ssl_cert_path }}">
+                                                <span>Here's auto redirect HTTPS</span>
+                                            </div>
+                                        </div>
+                                        <div class="protocol_tcp" id="protocol_tcp" style="display: none;">
+                                            <div class="form-group">
+                                                <label for="exampleInputName3">Frontend Port</label>
+                                                <input type="number" class="form-control" id="exampleInputName3" placeholder="Frontend Port" name="frontend_port" value="{{ frontend_port }}">
+                                            </div>
+                                            <div class="form-group">
+                                                <div class="form-check">
+                                                    <label class="form-check-label">
+                                                    <i class="mdi mdi-lock"></i><input type="checkbox" class="form-check-input" id="ssl_checkbox_tcp" name="ssl_checkbox"> Use SSL Certificate </label>
+                                                </div>
+                                            </div>
+                                            <div class="form-group" style="display: none;" id="ssl_fields_tcp">
+                                                <label for="exampleInputSSLTCP">SSL Certificate Path:</label>
+                                                <input type="text" id="exampleInputSSLTCP" class="form-control" name="ssl_cert_path" value="{{ ssl_cert_path }}">
+                                                <span>Here's auto redirect HTTPS</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-12 grid-margin stretch-card">
+                                    <div class="card">
+                                    <div class="card-body"  id="backend">
+                                        <h4 class="card-title"><i class="mdi mdi-server"></i>Backend</h4>
+                                        <div class="form-group">
+                                            <div class="form-group row" id="frontend">
+                                                <div class="col">
+                                                    <label for="exampleFormControlSelect3">Load Balancing Method</label>
+                                                    <select class="form-select form-select-sm" id="exampleFormControlSelect3" name="lb_method" id="lb_method">
+                                                    <option value="" disabled selected>--Select method--</option>
+                                                    <option value="roundrobin" {% if lb_method == 'roundrobin' %}selected{% endif %}>Round Robin</option>
+                                                    <option value="source" {% if lb_method == 'source' %}selected{% endif %}>IP Hash</option>
+                                                    <option value="leastconn" {% if lb_method == 'leastconn' %}selected{% endif %}>Least Connection</option>
+                                                    <option value="random" {% if lb_method == 'random' %}selected{% endif %}>Random</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <div class="col">
+                                                <label for="exampleInputName1">Backend Server 1 Name</label>
+                                                <input type="text" class="form-control" id="exampleInputName1" placeholder="Backend Server 1 Name" name="backend_server_names" value="{{ backend_server_names }}">
+                                            </div>
+                                            <div class="col">
+                                                <label for="exampleInputName2">Backend Server 1 IP</label>
+                                                <input type="text" class="form-control" id="exampleInputName2" placeholder="Backend Server 1 IP" name="backend_server_ips" value="{{ backend_server_ips }}">
+                                            </div>
+                                            <div class="col">
+                                                <label for="exampleInputName3">Backend Server 1 Port</label>
+                                                <input type="number" class="form-control" id="exampleInputName3" placeholder="Backend Server 1 Port" name="backend_server_ports" value="{{ backend_server_ports }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="btn btn-link btn-sm" onclick="addBackend()"><i class="mdi mdi-plus-network"> Add backend server</i></button>
+                                </div>
+                            </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary me-2" id="succes_btn" name="save_reload_update" value="Submit">Submit</button>
+                        </form>                        
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+    <script>
+        function protocolFunction() {
+            var protocol = document.getElementById("exampleFormControlSelect4").value;
+            var protocol_http = document.getElementById("protocol_http");
+            var protocol_tcp = document.getElementById("protocol_tcp");
+
+            // Hide both sections initially
+            protocol_http.style.display = 'none';
+            protocol_tcp.style.display = 'none';
+
+            if (protocol === "http") {
+                protocol_http.style.display = 'block';
+            } else if (protocol === "tcp") {
+                protocol_tcp.style.display = 'block';
+            }
+        }
+
+        // Function to toggle SSL fields
+        document.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('ssl_checkbox_http').addEventListener('change', function () {
+                document.getElementById('ssl_fields_http').style.display = this.checked ? 'block' : 'none';
+            });
+
+            document.getElementById('ssl_checkbox_tcp').addEventListener('change', function () {
+                document.getElementById('ssl_fields_tcp').style.display = this.checked ? 'block' : 'none';
+            });
+        });
+    </script>
+    <script>
+        let backendCounter = 1; // Counter mulai dari 1
+
+        function addBackend() {
+            // Menambah counter untuk label backend server
+            backendCounter++;
+
+            // Membuat elemen label dan input untuk nama backend server
+            var labelName = document.createElement("label");
+            labelName.setAttribute("for", "exampleInputName" + backendCounter);
+            labelName.textContent = "Backend Server " + backendCounter + " Name";
+            var x = document.createElement("INPUT");
+            x.setAttribute("type", "text");
+            x.setAttribute("id", "exampleInputName" + backendCounter);
+            x.setAttribute("placeholder", "Backend Server " + backendCounter + " Name");
+            x.setAttribute("name", "backend_server_names");
+            x.className = "form-control";
+
+            // Membuat elemen label dan input untuk IP backend server
+            var labelIP = document.createElement("label");
+            labelIP.setAttribute("for", "exampleInputName" + backendCounter);
+            labelIP.textContent = "Backend Server " + backendCounter + " IP";
+            var y = document.createElement("INPUT");
+            y.setAttribute("type", "text");
+            y.setAttribute("id", "exampleInputName" + backendCounter);
+            y.setAttribute("placeholder", "Backend Server " + backendCounter + " IP");
+            y.setAttribute("name", "backend_server_ips");
+            y.className = "form-control";
+
+            // Membuat elemen label dan input untuk port backend server
+            var labelPort = document.createElement("label");
+            labelPort.setAttribute("for", "exampleInputName" + backendCounter);
+            labelPort.textContent = "Backend Server " + backendCounter + " Port";
+            var z = document.createElement("INPUT");
+            z.setAttribute("type", "number");
+            z.setAttribute("id", "exampleInputName" + backendCounter);
+            z.setAttribute("placeholder", "Backend Server " + backendCounter + " Port");
+            z.setAttribute("name", "backend_server_ports");
+            z.className = "form-control";
+
+            // Membuat elemen div untuk setiap kolom dan menambahkan label dan input ke dalamnya
+            var colName = document.createElement("div");
+            colName.className = "col";
+            colName.appendChild(labelName);
+            colName.appendChild(x);
+
+            var colIP = document.createElement("div");
+            colIP.className = "col";
+            colIP.appendChild(labelIP);
+            colIP.appendChild(y);
+
+            var colPort = document.createElement("div");
+            colPort.className = "col";
+            colPort.appendChild(labelPort);
+            colPort.appendChild(z);
+
+            // Membuat row baru dan menambahkan kolom ke dalamnya
+            var newRow = document.createElement("div");
+            newRow.className = "form-group row";
+            newRow.appendChild(colName);
+            newRow.appendChild(colIP);
+            newRow.appendChild(colPort);
+
+            // Menambahkan row baru ke dalam container
+            var container = document.getElementById("backend");
+            container.appendChild(newRow);
+        }
+    </script>  
+        <!-- plugins:js -->
+        <script src="{{url_for('static', filename='vendors/js/vendor.bundle.base.js')}}"></script>
+        <!-- endinject -->
+        <!-- Plugin js for this page -->
+        <script src="{{url_for('static', filename='vendors/typeahead.js/typeahead.bundle.min.js')}}"></script>
+        <script src="{{url_for('static', filename='vendors/select2/select2.min.js')}}"></script>
+        <!-- End plugin js for this page -->
+        <!-- inject:js -->
+        <script src="{{url_for('static', filename='js/off-canvas.js')}}"></script>
+        <script src="{{url_for('static', filename='js/template.js')}}"></script>
+        <script src="{{url_for('static', filename='js/settings.js')}}"></script>
+        <script src="{{url_for('static', filename='js/todolist.js')}}"></script>
+        <!-- endinject -->
+        <!-- Custom js for this page-->
+        <script src="{{url_for('static', filename='js/file-upload.js')}}"></script>
+        <script src="{{url_for('static', filename='js/typeahead.js')}}"></script>
+        <script src="{{url_for('static', filename='js/select2.js')}}"></script>
+        <!-- End custom js for this page-->
+</html>

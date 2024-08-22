@@ -1,0 +1,16 @@
+<nav class="sidebar sidebar-offcanvas" id="sidebar">
+    <ul class="nav">
+      <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('home') }}">
+          <i class="icon-grid menu-icon"></i>
+          <span class="menu-title">Dashboard</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="http://{{ request.host.split(':')[0] }}:9999/stats">
+          <i class="icon-bar-graph menu-icon"></i>
+          <span class="menu-title">Statistics</span>
+        </a>
+      </li>
+    </ul>
+  </nav>
