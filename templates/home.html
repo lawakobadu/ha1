@@ -63,11 +63,14 @@
                                 <div class="card-body">
                                     <div id="detailedReports" class="carousel slide detailed-report-carousel position-static pt-2" data-bs-ride="carousel">
                                         <div class="carousel-inner">
-                                            <div class="carousel-item active">
+                                            <div class="carousel-item {% if haproxy_exists %}active{% endif %}">
                                                 <h1 class="text-primary mb-xl-4">{{ haproxy_name }}</h1>
-                                                <h3 class="font-weight-500 mb-xl-4"><i class="mdi mdi-web"></i><span class="mx-2">{{ frontend_count }}</span>Frontend</h3>
-                                                <h3 class="font-weight-500 mb-xl-4"><i class="mdi mdi-server"></i><span class="mx-2">{{ backend_count }}</span>Backend</h3>
-                                                <h3 class="font-weight-500 mb-xl-4"><i class="mdi mdi-webhook"></i>{% for mode in modes %}<span class="mx-2">{{ mode }}</span>{% endfor %}Mode</h3>
+                                                <h3 class="font-weight-500 mb-xl-3"><i class="mdi mdi-import"></i><span class="mx-2">Port :</span>{{ frontend_port }}</h3>
+                                                <h3 class="font-weight-500 mb-xl-3"><i class="mdi mdi-webhook"></i>{% for mode in modes %}<span class="mx-2">Mode : {{ mode }}</span>{% endfor %}</h3>
+                                                <h3 class="font-weight-500 mb-xl-3"><i class="mdi mdi-star"></i><span class="mx-2">Load Balance :</span>{{ lb_method }}</h3>
+                                                {% for server_name, server_ip in backend_servers %}
+                                                <h3 class="font-weight-500 mb-xl-3"><i class="mdi mdi-server"></i><span class="mx-2">{{ server_name }}</span>{{ server_ip }}</h3>
+                                                {% endfor %}
                                                 <a class="btn btn-warning font-weight-500 mb-xl-4" href="{{ url_for('edit', haproxy_name=haproxy_name) }}">Edit HAProxy</a>
                                                 <form action="/delete" method="POST" style="display: inline;">
                                                     <input type="hidden" name="haproxy_name" value="{{ haproxy_name }}">

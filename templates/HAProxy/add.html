@@ -43,8 +43,8 @@
                                         </div>
                                         <div class="form-group">
                                             <div class="col">
-                                                <label for="exampleFormControlSelect4">Protocol</label>
-                                                <select class="form-select form-select-sm" id="exampleFormControlSelect4" name="protocol" id="protocol" onchange="protocolFunction()">
+                                                <label for="protocol">Protocol</label>
+                                                <select class="form-select form-select-sm" id="protocol" name="protocol" onchange="protocolFunction()">
                                                 <option value="" disabled selected>--Select protocol--</option>
                                                 <option value="http">HTTP</option>
                                                 <option value="tcp">TCP</option>
@@ -60,7 +60,7 @@
                                             </div>
                                             <div class="form-group" style="display: none;" id="ssl_fields_http">
                                                 <label for="exampleInputSSLHTTP">SSL Certificate Path:</label>
-                                                <input type="text" id="exampleInputSSLHTTP" class="form-control" name="ssl_cert_path">
+                                                <textarea class="form-control" name="ssl_cert_path" id="exampleInputSSLHTTP" rows="10"></textarea>
                                                 <span>Here's auto redirect HTTPS</span>
                                             </div>
                                         </div>
@@ -77,7 +77,7 @@
                                             </div>
                                             <div class="form-group" style="display: none;" id="ssl_fields_tcp">
                                                 <label for="exampleInputSSLTCP">SSL Certificate Path:</label>
-                                                <input type="text" id="exampleInputSSLTCP" class="form-control" name="ssl_cert_path">
+                                                <textarea class="form-control" name="ssl_cert_path" id="exampleInputSSLTCP" rows="10"></textarea>
                                                 <span>Here's auto redirect HTTPS</span>
                                             </div>
                                         </div>
@@ -88,13 +88,13 @@
                             <div class="row">
                                 <div class="col-12 grid-margin stretch-card">
                                     <div class="card">
-                                    <div class="card-body"  id="backend">
+                                    <div class="card-body" id="backend">
                                         <h4 class="card-title"><i class="mdi mdi-server"></i>Backend</h4>
                                         <div class="form-group">
                                             <div class="form-group row" id="frontend">
                                                 <div class="col">
-                                                    <label for="exampleFormControlSelect3">Load Balancing Method</label>
-                                                    <select class="form-select form-select-sm" id="exampleFormControlSelect3" name="lb_method" id="lb_method">
+                                                    <label for="lb_method">Load Balancing Method</label>
+                                                    <select class="form-select form-select-sm" id="lb_method" name="lb_method" onchange="lb_methodFunction()">
                                                     <option value="" disabled selected>--Select method--</option>
                                                     <option value="roundrobin">Round Robin</option>
                                                     <option value="source">IP Hash</option>
@@ -104,26 +104,44 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="form-group row">
-                                            <div class="col">
-                                                <label for="exampleInputName1">Backend Server 1 Name</label>
-                                                <input type="text" class="form-control" id="exampleInputName1" placeholder="Backend Server 1 Name" name="backend_server_names">
+                                        <div class="wrr" id="wrr" style="display: none;">
+                                            <div class="form-group row">
+                                                <div class="col">
+                                                    <label for="exampleInputName1">Backend Server 1 Name</label>
+                                                    <input type="text" class="form-control" id="exampleInputName1" placeholder="Backend Server 1 Name" name="backend_server_names">
+                                                </div>
+                                                <div class="col">
+                                                    <label for="exampleInputName2">Backend Server 1 IP</label>
+                                                    <input type="text" class="form-control" id="exampleInputName2" placeholder="Backend Server 1 IP" name="backend_server_ips">
+                                                </div>
+                                                <div class="col">
+                                                    <label for="exampleInputName3">Backend Server 1 Port</label>
+                                                    <input type="number" class="form-control" id="exampleInputName3" placeholder="Backend Server 1 Port" name="backend_server_ports">
+                                                </div>
+                                                <div class="col">
+                                                    <label for="exampleInputName4">Backend Server 1 Weight</label>
+                                                    <input type="number" class="form-control" id="exampleInputName4" placeholder="Backend Server 1 Weight" name="backend_server_weights">
+                                                </div>
                                             </div>
-                                            <div class="col">
-                                                <label for="exampleInputName2">Backend Server 1 IP</label>
-                                                <input type="text" class="form-control" id="exampleInputName2" placeholder="Backend Server 1 IP" name="backend_server_ips">
-                                            </div>
-                                            <div class="col">
-                                                <label for="exampleInputName3">Backend Server 1 Port</label>
-                                                <input type="number" class="form-control" id="exampleInputName3" placeholder="Backend Server 1 Port" name="backend_server_ports">
-                                            </div>
-                                            <div class="col">
-                                                <label for="exampleInputName4">Backend Server 1 Weight</label>
-                                                <input type="number" class="form-control" id="exampleInputName4" placeholder="Backend Server 1 Weight" name="backend_server_weights">
+                                        </div>
+                                        <div class="other" id="other" style="display: none;">
+                                            <div class="form-group row">
+                                                <div class="col">
+                                                    <label for="exampleInputName1">Backend Server 1 Name</label>
+                                                    <input type="text" class="form-control" id="exampleInputName1" placeholder="Backend Server 1 Name" name="backend_server_names">
+                                                </div>
+                                                <div class="col">
+                                                    <label for="exampleInputName2">Backend Server 1 IP</label>
+                                                    <input type="text" class="form-control" id="exampleInputName2" placeholder="Backend Server 1 IP" name="backend_server_ips">
+                                                </div>
+                                                <div class="col">
+                                                    <label for="exampleInputName3">Backend Server 1 Port</label>
+                                                    <input type="number" class="form-control" id="exampleInputName3" placeholder="Backend Server 1 Port" name="backend_server_ports">
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                    <button type="button" class="btn btn-link btn-sm" onclick="addBackend()"><i class="mdi mdi-plus-network"> Add backend server</i></button>
+                                    <button type="button" class="btn btn-link btn-sm" id="addBackendBtn" style="display: none;" onclick="addBackend()"><i class="mdi mdi-plus-network"> Add backend server</i></button>
                                 </div>
                             </div>
                             </div>
@@ -136,9 +154,9 @@
     </body>
     <script>
         function protocolFunction() {
-            var protocol = document.getElementById("exampleFormControlSelect4").value;
-            var protocol_http = document.getElementById("protocol_http");
-            var protocol_tcp = document.getElementById("protocol_tcp");
+            let protocol = document.getElementById("protocol").value;
+            let protocol_http = document.getElementById("protocol_http");
+            let protocol_tcp = document.getElementById("protocol_tcp");
 
             // Hide both sections initially
             protocol_http.style.display = 'none';
@@ -161,6 +179,24 @@
                 document.getElementById('ssl_fields_tcp').style.display = this.checked ? 'block' : 'none';
             });
         });
+
+        function lb_methodFunction() {
+            let lb_method = document.getElementById("lb_method").value;
+            let wrr = document.getElementById("wrr");
+            let other = document.getElementById("other");
+            let addBackendBtn = document.getElementById("addBackendBtn");
+
+            // Menampilkan atau menyembunyikan input berdasarkan lb_method
+            if (lb_method === 'roundrobin') {
+                wrr.style.display = 'block';
+                other.style.display = 'none';
+                addBackendBtn.style.display = 'block'; // Tampilkan tombol
+            } else {
+                wrr.style.display = 'none';
+                other.style.display = 'block';
+                addBackendBtn.style.display = 'block'; // Tampilkan tombol
+            }
+        }
     </script>
     <script>
         let backendCounter = 1; // Counter mulai dari 1
@@ -168,6 +204,7 @@
         function addBackend() {
             // Menambah counter untuk label backend server
             backendCounter++;
+            let lb_method = document.getElementById("lb_method").value;
 
             // Membuat elemen label dan input untuk nama backend server
             var labelName = document.createElement("label");
@@ -201,6 +238,17 @@
             z.setAttribute("placeholder", "Backend Server " + backendCounter + " Port");
             z.setAttribute("name", "backend_server_ports");
             z.className = "form-control";
+            
+            // Membuat elemen label dan input untuk weight backend server
+            var labelWeight = document.createElement("label");
+            labelWeight.setAttribute("for", "exampleInputName" + backendCounter);
+            labelWeight.textContent = "Backend Server " + backendCounter + " Weight";
+            var w = document.createElement("INPUT");
+            w.setAttribute("type", "number");
+            w.setAttribute("id", "exampleInputName" + backendCounter);
+            w.setAttribute("placeholder", "Backend Server " + backendCounter + " Weight");
+            w.setAttribute("name", "backend_server_weights");
+            w.className = "form-control";
 
             // Membuat elemen div untuk setiap kolom dan menambahkan label dan input ke dalamnya
             var colName = document.createElement("div");
@@ -217,20 +265,34 @@
             colPort.className = "col";
             colPort.appendChild(labelPort);
             colPort.appendChild(z);
+            
+            var colWeight = document.createElement("div");
+            colWeight.className = "col";
+            colWeight.appendChild(labelWeight);
+            colWeight.appendChild(w);
 
             // Membuat row baru dan menambahkan kolom ke dalamnya
             var newRow = document.createElement("div");
             newRow.className = "form-group row";
-            newRow.appendChild(colName);
-            newRow.appendChild(colIP);
-            newRow.appendChild(colPort);
 
-            // Menambahkan row baru ke dalam container
-            var container = document.getElementById("backend");
-            container.appendChild(newRow);
+            if (lb_method === 'roundrobin') {
+                newRow.appendChild(colName);
+                newRow.appendChild(colIP);
+                newRow.appendChild(colPort);
+                newRow.appendChild(colWeight);
+                // Menambahkan row baru ke dalam container
+                let container = document.getElementById("wrr");
+                container.appendChild(newRow);
+            } else {
+                newRow.appendChild(colName);
+                newRow.appendChild(colIP);
+                newRow.appendChild(colPort);
+                // Menambahkan row baru ke dalam container
+                let container = document.getElementById("other");
+                container.appendChild(newRow);
+            }
         }
     </script>
-    
         <!-- plugins:js -->
         <script src="{{url_for('static', filename='vendors/js/vendor.bundle.base.js')}}"></script>
         <!-- endinject -->

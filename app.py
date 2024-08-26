@@ -25,6 +25,7 @@ def read_from_file():
         # Memperbarui pola regex untuk menangkap semua elemen dengan benar
         pattern = re.compile(r'frontend\s+(\S+)\s+.*?bind\s+(\S+):(\d+).*?\n\s+mode\s+(\S+).*?\n\s+default_backend\s+(\S+).*?\nbackend\s+(\S+).*?\n\s+balance\s+(\S+).*?\n\s+server\s+(\S+)\s+(\S+):(\d+)\s+check', re.DOTALL)
         matches = pattern.findall(content)
+        print("matches : ", matches)
 
         # Format data untuk ditampilkan dalam tabel
         for match in matches:
@@ -78,10 +79,16 @@ def save_to_file(data):
         haproxy_cfg.write(f"        balance {lb_method}\n")
 
         # Adding backend servers
-        for backend_server_info in backend_servers:
-            backend_server_name, backend_server_ip, backend_server_port = backend_server_info
-            if backend_server_name and backend_server_ip and backend_server_port:
-                haproxy_cfg.write(f"        server {backend_server_name} {backend_server_ip}:{backend_server_port} check\n")
+        if lb_method == 'roundrobin':
+            for backend_server_info in backend_servers:
+                backend_server_name, backend_server_ip, backend_server_port, backend_server_weight = backend_server_info
+                if backend_server_name and backend_server_ip and backend_server_port and backend_server_weight:
+                    haproxy_cfg.write(f"        server {backend_server_name} {backend_server_ip}:{backend_server_port} weight {backend_server_weight} check\n")
+        elif lb_method != 'roundrobin':
+            for backend_server_info in backend_servers:
+                backend_server_name, backend_server_ip, backend_server_port = backend_server_info
+                if backend_server_name and backend_server_ip and backend_server_port:
+                    haproxy_cfg.write(f"        server {backend_server_name} {backend_server_ip}:{backend_server_port} check\n")
 
         # Stats configuration
         haproxy_cfg.write(f"\nlisten stats\n")
@@ -155,14 +162,16 @@ def delete_to_file(haproxy_name):
     return f"Frontend '{haproxy_name}' and its associated backend have been deleted."
 
 
-def sum_haproxy():
-    frontend_count = 0
-    backend_count = 0
+def haproxy_info():
     layer7_count = 0
     layer4_count = 0
     haproxy_name = ''
+    frontend_port = ''
+    lb_method = ''
+    backend_servers = []
     modes = set()
     inside_frontend = False
+    inside_backend = False
 
     with open(CONFIG_FILE_PATH, 'r') as haproxy_cfg:
         lines = haproxy_cfg.readlines()
@@ -172,15 +181,29 @@ def sum_haproxy():
 
             # Detect frontend blocks
             if line.startswith('frontend '):
-                frontend_count += 1
                 haproxy_name = line.split()[1]  # Capture the current frontend name
                 inside_frontend = True  # We are inside a frontend block
+                inside_backend = False  # We are inside a frontend block
 
             # Detect backend blocks
             elif line.startswith('backend '):
-                backend_count += 1
                 haproxy_name = line.split()[1]  # Capture the current backend name
                 inside_frontend = False  # We are no longer inside a frontend block
+                inside_backend = True  # We are no longer inside a frontend block
+            
+            if inside_frontend and line.startswith('bind '):
+                bind_parts = line.split()
+                if ':' in bind_parts[1]:  # Assuming bind format is "bind *:80"
+                    frontend_port = bind_parts[1].split(':')[1]
+            
+            if inside_backend and line.startswith('balance '):
+                lb_method = line.split()[1]
+            
+            if inside_backend and line.startswith('server '):
+                parts = line.split()
+                server_name = parts[1]  # Extract server name
+                server_ip = parts[2].split(':')[0]  # Extract server IP (before the colon)
+                backend_servers.append((server_name, server_ip))
 
             # Check for protocol modes only inside frontend blocks
             if inside_frontend and line.startswith('mode'):
@@ -191,7 +214,7 @@ def sum_haproxy():
                 elif mode == 'tcp':
                     layer4_count += 1
 
-    return frontend_count, backend_count, layer7_count, layer4_count, haproxy_name, modes
+    return frontend_port, layer7_count, layer4_count, haproxy_name, modes, lb_method, backend_servers
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -219,10 +242,10 @@ def home():
     if not session.get('logged_in'):
         return '<script>alert("Harus login dulu"); window.location.href = "/";</script>'
 
-    frontend_count, backend_count, layer7_count, layer4_count, haproxy_name, modes  = sum_haproxy()
+    frontend_port, layer7_count, layer4_count, haproxy_name, modes, lb_method, backend_servers = haproxy_info()
     haproxy_exists = is_haproxy_exist()
 
-    return render_template('home.html', frontend_count=frontend_count, backend_count=backend_count, layer7_count=layer7_count, layer4_count=layer4_count, haproxy_name=haproxy_name, modes=modes, haproxy_exists=haproxy_exists)
+    return render_template('home.html', frontend_port=frontend_port, layer7_count=layer7_count, layer4_count=layer4_count, haproxy_name=haproxy_name, modes=modes, lb_method=lb_method, backend_servers=backend_servers, haproxy_exists=haproxy_exists)
 
 @app.route('/logout')
 def logout():
@@ -235,20 +258,33 @@ def add():
         return '<script>alert("Harus login dulu"); window.location.href = "/";</script>'
 
     if request.method == 'POST':
+        lb_method = request.form['lb_method']
+
         data = {
             'haproxy_name': request.form['haproxy_name'],
             'frontend_port': request.form['frontend_port'],
-            'lb_method': request.form['lb_method'],
+            'lb_method': lb_method,
             'protocol': request.form['protocol'],
             'use_ssl': 'ssl_checkbox' in request.form,
             'ssl_cert_path': request.form.get('ssl_cert_path', ''),
-            'backend_servers': list(zip(
+        }
+
+        if lb_method == 'roundrobin':
+            # Include weights for roundrobin
+            data['backend_servers'] = list(zip(
+                request.form.getlist('backend_server_names'),
+                request.form.getlist('backend_server_ips'),
+                request.form.getlist('backend_server_ports'),
+                request.form.getlist('backend_server_weights')
+        ))
+        else:
+            # For other methods, omit weights
+            data['backend_servers'] = list(zip(
                 request.form.getlist('backend_server_names'),
                 request.form.getlist('backend_server_ips'),
                 request.form.getlist('backend_server_ports')
-            ))
-        }
-
+        ))
+        
         # Save configuration to file
         result = save_to_file(data)
 
@@ -296,7 +332,7 @@ def edit(haproxy_name):
                 request.form.getlist('backend_server_names'),
                 request.form.getlist('backend_server_ips'),
                 request.form.getlist('backend_server_ports')
-            ))
+                ))
             })
 
             # Step 2: Delete the old configuration
