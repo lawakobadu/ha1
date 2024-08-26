@@ -54,9 +54,9 @@
                             </div>
                         </div>
                     </div>
-
+                    {% if not haproxy_exists  %}
                     <a class="btn btn-primary me-2 mb-xl-4" href="{{ url_for('add') }}">Add HAProxy</a>
-
+                    {% endif %}
                     <div class="row">
                         <div class="col-md-12 grid-margin stretch-card">
                             <div class="card position-relative">
@@ -91,7 +91,7 @@
         // JavaScript to dynamically set the date
         const currentDateElement = document.getElementById('currentDate');
         const options = { day: 'numeric', month: 'short', year: 'numeric' };
-        const today = new Date().toLocaleDateString('en-GB', options); // Example format: 10 Jan 2021
+        const today = new Date().toLocaleDateString('en-GB', options);
         currentDateElement.textContent = `Today (${today})`;
     </script>
     <script src="{{ url_for('static', filename='/vendors/js/vendor.bundle.base.js') }}"></script>

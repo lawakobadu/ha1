@@ -10,6 +10,13 @@ PASSWORD = "admin123"
 # Path ke file konfigurasi HAProxy di dalam folder static
 CONFIG_FILE_PATH = ('/etc/haproxy/haproxy.cfg')
 
+def is_haproxy_exist():
+    with open('/etc/haproxy/haproxy.cfg', 'r') as haproxy_cfg:
+        content = haproxy_cfg.read()
+        if "frontend " in content or "backend " in content:
+            return True
+    return False
+
 def read_from_file():
     data = []
     with open(CONFIG_FILE_PATH, 'r') as f:
@@ -33,6 +40,9 @@ def read_from_file():
     return data
 
 def save_to_file(data):
+    if is_haproxy_exist():
+        return {'success': False, 'message': "Konfigurasi HAProxy sudah ada. Tidak bisa menambah konfigurasi baru."}
+
     haproxy_name = data.get('haproxy_name')
     frontend_port = data.get('frontend_port')
     protocol = data.get('protocol')
@@ -83,14 +93,13 @@ def save_to_file(data):
         haproxy_cfg.write(f"        stats realm Haproxy\\ Statistics\n")
         haproxy_cfg.write(f"        stats auth admin:password\n")
 
-    return "Frontend and Backend added successfully."
+    return {'success': True, 'message': "Frontend and Backend added successfully."}
 
 
 def delete_to_file(haproxy_name):
     with open(CONFIG_FILE_PATH, 'r') as haproxy_cfg:
         lines = haproxy_cfg.readlines()
 
-    # Identify the lines to remove
     new_lines = []
     inside_frontend = False
     inside_backend = False
@@ -98,45 +107,52 @@ def delete_to_file(haproxy_name):
     backend_name = None
 
     for line in lines:
+        stripped_line = line.strip()
+
         # Handle frontend section
-        if line.startswith(f"frontend {haproxy_name}"):
+        if stripped_line.startswith(f"frontend {haproxy_name}"):
             inside_frontend = True
             continue  # Skip this line (delete it)
         
-        if inside_frontend and line.strip().startswith("default_backend"):
-            backend_name = line.strip().split(" ")[1]  # Capture the backend name to delete
+        if inside_frontend and stripped_line.startswith("default_backend"):
+            backend_name = stripped_line.split(" ")[1]  # Capture the backend name to delete
 
-        if inside_frontend and not line.startswith(" "):
+        if inside_frontend and not stripped_line:
             # End of frontend block
             inside_frontend = False
-
+            continue
+        
         # Handle backend section
-        if backend_name and line.startswith(f"backend {haproxy_name}"):
+        if backend_name and stripped_line.startswith(f"backend {backend_name}"):
             inside_backend = True
             continue  # Skip this line (delete it)
         
-        if inside_backend and not line.startswith(" "):
+        if inside_backend and not stripped_line:
             # End of backend block
             inside_backend = False
-
+            backend_name = None  # Reset backend name after processing
+            continue
+        
         # Handle listen stats section
-        if line.startswith("listen stats"):
+        if stripped_line.startswith("listen stats"):
             inside_listen_stats = True
             continue  # Skip this line (delete it)
         
-        if inside_listen_stats and not line.startswith(" "):
+        if inside_listen_stats and not stripped_line:
             # End of listen stats block
             inside_listen_stats = False
+            continue
 
-        # Retain lines that are not inside the frontend, backend, or listen stats blocks
+        # Add non-empty lines and lines outside of the deleted sections
         if not inside_frontend and not inside_backend and not inside_listen_stats:
-            new_lines.append(line)
+            if stripped_line or new_lines and new_lines[-1].strip():  # Avoid adding multiple blank lines
+                new_lines.append(line)
 
     # Write the updated configuration back to the file
     with open(CONFIG_FILE_PATH, 'w') as haproxy_cfg:
         haproxy_cfg.writelines(new_lines)
 
-    return f"Frontend '{haproxy_name}', its associated backend have been deleted."
+    return f"Frontend '{haproxy_name}' and its associated backend have been deleted."
 
 
 def sum_haproxy():
@@ -180,37 +196,44 @@ def sum_haproxy():
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+    if session.get('logged_in'):
+        return '<script>alert("Akses dilarang"); window.location.href = "/home";</script>'
+
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
 
         if username == USERNAME and password == PASSWORD:
-            # Set session to indicate user is logged in
+
             session['logged_in'] = True
             session['username'] = username
-            return redirect(url_for("home"))  # Redirect to a dashboard or another page
+            return redirect(url_for("home"))  
 
         else:
-            flash("Invalid username or password", "danger")  # Display an error message
+            flash("Invalid username or password", "danger") 
 
     return render_template('index.html')
 
 @app.route("/home")
 def home():
     if not session.get('logged_in'):
-        return redirect(url_for('index'))
+        return '<script>alert("Harus login dulu"); window.location.href = "/";</script>'
 
     frontend_count, backend_count, layer7_count, layer4_count, haproxy_name, modes  = sum_haproxy()
+    haproxy_exists = is_haproxy_exist()
 
-    return render_template('home.html', frontend_count=frontend_count, backend_count=backend_count, layer7_count=layer7_count, layer4_count=layer4_count, haproxy_name=haproxy_name, modes=modes)
+    return render_template('home.html', frontend_count=frontend_count, backend_count=backend_count, layer7_count=layer7_count, layer4_count=layer4_count, haproxy_name=haproxy_name, modes=modes, haproxy_exists=haproxy_exists)
 
 @app.route('/logout')
 def logout():
-    session.clear
+    session.clear()
     return redirect(url_for('index'))
 
 @app.route("/add", methods=['GET', 'POST'])
 def add():
+    if not session.get('logged_in'):
+        return '<script>alert("Harus login dulu"); window.location.href = "/";</script>'
+
     if request.method == 'POST':
         data = {
             'haproxy_name': request.form['haproxy_name'],
@@ -229,27 +252,33 @@ def add():
         # Save configuration to file
         result = save_to_file(data)
 
-        if 'save_reload_create' in request.form:
-            # Run haproxy -c -V -f to check the configuration
-            check_result = subprocess.run(['haproxy', '-c', '-V', '-f', CONFIG_FILE_PATH], capture_output=True, text=True)
-            check_output = check_result.stdout
+        if result['success']:
+            if 'save_reload_create' in request.form:
+                # Run haproxy -c -V -f to check the configuration
+                check_result = subprocess.run(['haproxy', '-c', '-V', '-f', CONFIG_FILE_PATH], capture_output=True, text=True)
+                check_output = check_result.stdout
 
-            # Check if there was an error, and if so, append it to the output
-            if check_result.returncode != 0:
-                error_message = check_result.stderr
-                check_output += f"\n\nError occurred:\n{error_message}"
-            else:
-                # If no error, run haproxy -D -f to reload HAProxy
-                reload_result = subprocess.run(['systemctl', 'restart', 'haproxy', CONFIG_FILE_PATH], capture_output=True, text=True)
-                check_output += f"\n\nHAProxy Restart Output:\n{reload_result.stdout}"
+                # Check if there was an error, and if so, append it to the output
+                if check_result.returncode != 0:
+                    error_message = check_result.stderr
+                    check_output += f"\n\nError occurred:\n{error_message}"
+                else:
+                    # If no error, run haproxy -D -f to reload HAProxy
+                    reload_result = subprocess.run(['systemctl', 'restart', 'haproxy', CONFIG_FILE_PATH], capture_output=True, text=True)
+                    check_output += f"\n\nHAProxy Restart Output:\n{reload_result.stdout}"
 
-        return redirect(url_for('home'))
+            return redirect(url_for('home'))
+        else:
+            return '<script>alert("Konfigurasi HAProxy sudah ada. Tidak bisa menambah konfigurasi baru."); window.location.href = "/home";</script>'
 
     return render_template('HAProxy/add.html')
 
 
 @app.route("/edit/<string:haproxy_name>", methods=['GET', 'POST'])
 def edit(haproxy_name):
+    if not session.get('logged_in'):
+        return '<script>alert("Harus login dulu"); window.location.href = "/";</script>'
+        
     data = read_from_file()
     item = next((d for d in data if d['haproxy_name'] == haproxy_name), None)
 
@@ -321,11 +350,6 @@ def delete():
             return redirect(url_for('home'))
 
     return render_template('home.html')
-
-
-@app.route("/add2")
-def add2():
-    return render_template('HAProxy/add2.html')
 
 
 if __name__ == '__main__':
