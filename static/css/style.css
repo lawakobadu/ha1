@@ -10473,7 +10473,7 @@ progress {
 .tt-hint, .select2-container--default .select2-selection--single .select2-search__field, .select2-container--default .select2-selection--single, .dataTables_wrapper select {
   display: block;
   width: 100%;
-  padding: 1.125rem 1.375rem;
+  padding: 0.75rem 0.75rem;
   font-size: 0.875rem;
   font-weight: 400;
   line-height: 1;
@@ -24320,7 +24320,7 @@ table.dataTable tbody td.select-checkbox:after {
 }
 .navbar .navbar-brand-wrapper .navbar-brand img {
   max-width: 100%;
-  height: 34px;
+  height: 50px;
   margin: auto;
   vertical-align: middle;
 }
@@ -24329,7 +24329,7 @@ table.dataTable tbody td.select-checkbox:after {
   text-align: center;
 }
 .navbar .navbar-brand-wrapper .brand-logo-mini img {
-  width: calc(70px - 30px);
+  height: 24px;
   max-width: 100%;
   margin: auto;
 }

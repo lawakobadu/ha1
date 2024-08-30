@@ -4,7 +4,7 @@
     <!-- Required meta tags -->
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Home</title>
+    <title>HAProxy - Home</title>
     <!-- plugins:css -->
     <link rel="stylesheet" href="{{ url_for('static', filename='vendors/feather/feather.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='vendors/ti-icons/css/themify-icons.css') }}">
@@ -21,7 +21,7 @@
     <!-- inject:css -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <!-- endinject -->
-    <link rel="shortcut icon" href="{{ url_for('static', filename='images/logo.svg') }}" />
+    <link rel="shortcut icon" href="{{ url_for('static', filename='images/logo.png') }}" />
 </head>
 <body>
     <div class="container-scroller">
@@ -37,20 +37,6 @@
                                     <h3 class="font-weight-bold">Welcome User {{ session['username'] }}</h3>
                                     <h6 class="font-weight-normal mb-0">This is your HAProxy Configurator</h6>
                                 </div>
-                                <div class="col-12 col-xl-4">
-                                    <div class="justify-content-end d-flex">
-                                        <div class="dropdown flex-md-grow-1 flex-xl-grow-0">
-                                            <button class="btn btn-sm btn-light bg-white #dropdown-toggle" type="button" id="dropdownMenuDate2" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
-                                                <i class="mdi mdi-calendar"></i> <span id="currentDate">Today </button>
-                                            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenuDate2">
-                                                <a class="dropdown-item" href="#">January - March</a>
-                                                <a class="dropdown-item" href="#">March - June</a>
-                                                <a class="dropdown-item" href="#">June - August</a>
-                                                <a class="dropdown-item" href="#">August - November</a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -64,13 +50,28 @@
                                     <div id="detailedReports" class="carousel slide detailed-report-carousel position-static pt-2" data-bs-ride="carousel">
                                         <div class="carousel-inner">
                                             <div class="carousel-item {% if haproxy_exists %}active{% endif %}">
-                                                <h1 class="text-primary mb-xl-4">{{ haproxy_name }}</h1>
-                                                <h3 class="font-weight-500 mb-xl-3"><i class="mdi mdi-import"></i><span class="mx-2">Port :</span>{{ frontend_port }}</h3>
-                                                <h3 class="font-weight-500 mb-xl-3"><i class="mdi mdi-webhook"></i>{% for mode in modes %}<span class="mx-2">Mode : {{ mode }}</span>{% endfor %}</h3>
-                                                <h3 class="font-weight-500 mb-xl-3"><i class="mdi mdi-star"></i><span class="mx-2">Load Balance :</span>{{ lb_method }}</h3>
+                                                <h2 class="text-primary mb-xl-4">{{ haproxy_name }}</h2>
+                                                <h4 class="font-weight-500 mb-xl-3"><i class="mdi mdi-import"></i><span class="mx-2">Port :</span>{{ frontend_port }}</h4>
+                                                <h4 class="font-weight-500 mb-xl-3"><i class="mdi mdi-webhook"></i>{% for mode in modes %}<span class="mx-2">Mode : {{ mode }}</span>{% endfor %}</h4>
+                                                <h4 class="font-weight-500 mb-xl-3"><i class="mdi mdi-star"></i><span class="mx-2">Algorithm :</span>
+                                                {% if lb_method == 'roundrobin' %}
+                                                    Round Robin
+                                                {% elif lb_method == 'source' %}
+                                                    IP Hash
+                                                {% elif lb_method == 'leastconn' %}
+                                                    Least Connection
+                                                {% else %}
+                                                    {{ lb_method }}
+                                                {% endif %}
+                                                </h4>
                                                 {% for server_name, server_ip in backend_servers %}
-                                                <h3 class="font-weight-500 mb-xl-3"><i class="mdi mdi-server"></i><span class="mx-2">{{ server_name }}</span>{{ server_ip }}</h3>
+                                                <h4 class="font-weight-500 mb-xl-3"><i class="mdi mdi-server"></i><span class="mx-2">{{ server_name }}</span>{{ server_ip }}</h4>
                                                 {% endfor %}
+                                                <h4 class="font-weight-500 mb-xl-3">link : 
+                                                    <a target="_blank" href="{% if domain_exists %}https://{{ domain_exists }}{% else %}http://{{ request.host.split(':')[0] }}{% endif %}">
+                                                        {% if domain_exists %}{{ domain_exists }}{% else %}{{ request.host.split(':')[0] }}{% endif %}
+                                                    </a>
+                                                </h4>
                                                 <a class="btn btn-warning font-weight-500 mb-xl-4" href="{{ url_for('edit', haproxy_name=haproxy_name) }}">Edit HAProxy</a>
                                                 <form action="/delete" method="POST" style="display: inline;">
                                                     <input type="hidden" name="haproxy_name" value="{{ haproxy_name }}">
@@ -90,13 +91,6 @@
             </div>
         </div>
     </div>
-    <script>
-        // JavaScript to dynamically set the date
-        const currentDateElement = document.getElementById('currentDate');
-        const options = { day: 'numeric', month: 'short', year: 'numeric' };
-        const today = new Date().toLocaleDateString('en-GB', options);
-        currentDateElement.textContent = `Today (${today})`;
-    </script>
     <script src="{{ url_for('static', filename='/vendors/js/vendor.bundle.base.js') }}"></script>
     <!-- endinject -->
     <!-- Plugin js for this page -->
