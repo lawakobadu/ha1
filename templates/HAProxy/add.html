@@ -39,7 +39,7 @@
                                             <h4 class="card-title"><i class="mdi mdi-web"></i> Add new configuration</h4>
                                             <div class="form-group">
                                                 <label for="exampleInputName1">Haproxy Name</label>
-                                                <input type="text" class="form-control" id="exampleInputName1" placeholder="Haproxy Name" name="haproxy_name" required>
+                                                <input type="text" class="form-control" id="haproxy_name" placeholder="Haproxy Name" name="haproxy_name" required>
                                             </div>
                                             <div class="form-group">
                                                 <div class="col">
@@ -53,7 +53,7 @@
                                             </div>
                                             <div class="form-group" id="frontend_port_group" style="display: none;">
                                                 <label for="exampleInputNamePort">Frontend Port</label>
-                                                <input type="number" class="form-control" id="exampleInputNamePort" placeholder="Frontend Port" name="frontend_port">
+                                                <input type="number" class="form-control" id="frontend_port" placeholder="Frontend Port" name="frontend_port">
                                             </div>                                            
                                             <div class="form-group">
                                                 <div class="form-check">
@@ -64,12 +64,12 @@
                                             <div class="ssl_fields" id="ssl_fields" style="display: none;">
                                                 <div class="form-group">
                                                     <label for="exampleInputSSL">SSL Certificate:</label>
-                                                    <textarea class="form-control" name="ssl_cert_path" id="exampleInputSSL" rows="10"></textarea>
+                                                    <textarea class="form-control" name="ssl_cert_path" id="ssl_cert_path" rows="10"></textarea>
                                                     <span>Here's auto redirect HTTPS</span>
                                                 </div>
                                                 <div class="form-group">
                                                     <label for="exampleInputName2">Domain Name</label>
-                                                    <input type="text" class="form-control" id="exampleInputName2" placeholder="Domain Name" name="domain_name">
+                                                    <input type="text" class="form-control" id="domain_name" placeholder="Domain Name" name="domain_name">
                                                 </div>
                                             </div>
                                         </div>
@@ -95,22 +95,22 @@
                                             </div>
                                         </div>
                                         <div class="lb_fields" id="lb_fields" style="display: none;">
-                                            <div class="form-group row">
+                                            <div class="form-group row g-3 align-items-end">
                                                 <div class="col">
                                                     <label for="exampleInputName1">Server 1 Name</label>
-                                                    <input type="text" class="form-control" id="exampleInputName1" placeholder="Server 1 Name" name="backend_server_names">
+                                                    <input type="text" class="form-control" id="backend_server_names" placeholder="Server 1 Name" name="backend_server_names">
                                                 </div>
                                                 <div class="col">
                                                     <label for="exampleInputName2">IP Address</label>
-                                                    <input type="text" class="form-control" id="exampleInputName2" placeholder="IP Address" name="backend_server_ips">
+                                                    <input type="text" class="form-control" id="backend_server_ips" placeholder="IP Address" name="backend_server_ips">
                                                 </div>
                                                 <div class="col-2">
                                                     <label for="exampleInputName3">Port</label>
-                                                    <input type="number" class="form-control" id="exampleInputName3" placeholder="Port" name="backend_server_ports">
+                                                    <input type="number" class="form-control" id="backend_server_ports" placeholder="Port" name="backend_server_ports">
                                                 </div>
-                                                <div class="col-2" id="weight_field" style="display: none;">
+                                                <div class="col-1" id="weight_field" style="display: none;">
                                                     <label for="exampleInputName4">Weight</label>
-                                                    <input type="number" class="form-control" id="exampleInputName4" placeholder="Weight" name="backend_server_weights" value="1">
+                                                    <input type="number" class="form-control" id="backend_server_weights" placeholder="Weight" name="backend_server_weights" value="1">
                                                 </div>                                            
                                             </div>
                                         </div>
@@ -179,7 +179,31 @@
         function addBackend() {
             // Menambah counter untuk label backend server
             backendCounter++;
-    
+
+            // Membuat elemen button untuk menghapus baris
+            var deleteButton = document.createElement("button");
+            deleteButton.setAttribute("type", "button");
+            deleteButton.className = "btn btn-danger rounded-circle";
+            deleteButton.style.cssText = "--bs-btn-padding-y: 2px; --bs-btn-padding-x: 2px; --bs-btn-font-size: .75rem; transform: translateY(-10px);";
+            
+            // Fungsi untuk menghapus row dan memperbarui nomor server
+            deleteButton.addEventListener("click", function() {
+                newRow.remove();
+                updateServerNumbers();
+            });
+
+            // Membuat elemen ikon di dalam button
+            var deleteIcon = document.createElement("i");
+            deleteIcon.className = "mdi mdi-minus text-white";
+
+            // Menambahkan ikon ke dalam button
+            deleteButton.appendChild(deleteIcon);
+
+            // Membuat elemen div untuk col-auto yang berisi button hapus
+            var colAuto = document.createElement("div");
+            colAuto.className = "col-auto";
+            colAuto.appendChild(deleteButton);
+
             // Membuat elemen label dan input untuk nama backend server
             var labelName = document.createElement("label");
             labelName.setAttribute("for", "exampleInputName" + backendCounter);
@@ -190,7 +214,13 @@
             x.setAttribute("placeholder", "Server " + backendCounter + " Name");
             x.setAttribute("name", "backend_server_names");
             x.className = "form-control";
-    
+
+            // Membuat elemen div untuk kolom nama backend server
+            var colName = document.createElement("div");
+            colName.className = "col";
+            colName.appendChild(labelName);
+            colName.appendChild(x);
+
             // Membuat elemen label dan input untuk IP backend server
             var labelIP = document.createElement("label");
             labelIP.setAttribute("for", "exampleInputName" + backendCounter);
@@ -201,7 +231,13 @@
             y.setAttribute("placeholder", "IP Address");
             y.setAttribute("name", "backend_server_ips");
             y.className = "form-control";
-    
+
+            // Membuat elemen div untuk kolom IP backend server
+            var colIP = document.createElement("div");
+            colIP.className = "col";
+            colIP.appendChild(labelIP);
+            colIP.appendChild(y);
+
             // Membuat elemen label dan input untuk port backend server
             var labelPort = document.createElement("label");
             labelPort.setAttribute("for", "exampleInputName" + backendCounter);
@@ -212,30 +248,21 @@
             z.setAttribute("placeholder", "Port");
             z.setAttribute("name", "backend_server_ports");
             z.className = "form-control";
-    
-            // Membuat elemen div untuk setiap kolom dan menambahkan label dan input ke dalamnya
-            var colName = document.createElement("div");
-            colName.className = "col";
-            colName.appendChild(labelName);
-            colName.appendChild(x);
-    
-            var colIP = document.createElement("div");
-            colIP.className = "col";
-            colIP.appendChild(labelIP);
-            colIP.appendChild(y);
-    
+
+            // Membuat elemen div untuk kolom port backend server
             var colPort = document.createElement("div");
             colPort.className = "col-2";
             colPort.appendChild(labelPort);
             colPort.appendChild(z);
-    
-            // Membuat row baru dan menambahkan kolom ke dalamnya
+
+            // Membuat row baru dan menambahkan col-auto dan kolom ke dalamnya
             var newRow = document.createElement("div");
-            newRow.className = "form-group row";
+            newRow.className = "form-group row g-3 align-items-end";
+            newRow.appendChild(colAuto);  // Tambahkan col-auto (button hapus) sebelum kolom nama backend server
             newRow.appendChild(colName);
             newRow.appendChild(colIP);
             newRow.appendChild(colPort);
-    
+
             // Jika lb_method adalah roundrobin, tambahkan input untuk weight
             if (lbMethod === "roundrobin") {
                 var labelWeight = document.createElement("label");
@@ -247,27 +274,38 @@
                 w.setAttribute("placeholder", "Weight");
                 w.setAttribute("name", "backend_server_weights");
                 w.className = "form-control";
-    
+
                 var colWeight = document.createElement("div");
-                colWeight.className = "col-2";
+                colWeight.className = "col-1";
                 colWeight.appendChild(labelWeight);
                 colWeight.appendChild(w);
-    
+
                 newRow.appendChild(colWeight);
             }
-    
+
             // Menambahkan row baru ke dalam container
             var container = document.getElementById("lb_fields");
             container.appendChild(newRow);
         }
-    
+
+        // Fungsi untuk memperbarui nomor server setelah penghapusan
+        function updateServerNumbers() {
+            var rows = document.querySelectorAll("#lb_fields .form-group.row");
+            backendCounter = 0;
+            rows.forEach(function(row, index) {
+                backendCounter++;
+                var labelName = row.querySelector(".col label");
+                var inputName = row.querySelector(".col input");
+                labelName.textContent = "Server " + backendCounter + " Name";
+                inputName.setAttribute("placeholder", "Server " + backendCounter + " Name");
+            });
+        }
+
         // Jalankan fungsi ini saat halaman dimuat untuk memeriksa status awal
         document.addEventListener('DOMContentLoaded', function () {
             lbMethodFunction();
         });
-    </script>
-    
-    
+    </script>    
         <!-- plugins:js -->
         <script src="{{url_for('static', filename='vendors/js/vendor.bundle.base.js')}}"></script>
         <!-- endinject -->

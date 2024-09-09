@@ -1,18 +1,18 @@
-from flask import Flask, jsonify, render_template, Response, request, url_for, session, redirect, flash
+from flask import Flask, jsonify, render_template, Response, request, url_for, session, redirect, flash, make_response
 from werkzeug.security import generate_password_hash, check_password_hash
-import subprocess, re, os
+import subprocess, re, os, jwt, datetime, json
+from functools import wraps
+
 
 app = Flask(__name__)
-app.secret_key = 'haproxy'
+app.secret_key = 'f7d3814dd7f44e6ab8ff23c98a92c7fc'
 
-users = {
-    'admin': generate_password_hash('admin123')
-}
 
 # Path ke file konfigurasi HAProxy di dalam folder static
 CONFIG_FILE_PATH = ('/etc/haproxy/haproxy.cfg')
 SSL_FILE_PATH = ('/etc/haproxy-dashboard/ssl/key.pem')
 DOMAIN_FILE_PATH = ('/etc/haproxy-dashboard/ssl/domain.txt')
+USER_FILE_PATH = ('/etc/haproxy-dashboard/admin/user.json')
 
 
 def certificate(content):
@@ -20,10 +20,37 @@ def certificate(content):
         file.write(content)
     return f"{SSL_FILE_PATH}"
 
+
 def domain(domain_content):
     with open(DOMAIN_FILE_PATH, 'w') as file:
         file.write(domain_content)
     return f"{DOMAIN_FILE_PATH}"
+
+
+def is_user_exist():
+    with open(USER_FILE_PATH, 'r') as user:
+        return json.load(user)
+
+
+def save_users(users):
+    with open(USER_FILE_PATH, 'w') as f:
+        json.dump(users, f, indent=4)
+
+
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.args.get('token')
+        if not token:
+            return jsonify({'error': 'Token is missing!'}), 403
+        try:
+            jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token has expired!'}), 403
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Token is invalid!'}), 403
+        return f(*args, **kwargs)
+    return decorated
 
 
 def is_haproxy_exist():
@@ -33,14 +60,14 @@ def is_haproxy_exist():
             return True
     return False
 
+
 def is_domain_exist():
     if os.path.exists(DOMAIN_FILE_PATH):
         with open(DOMAIN_FILE_PATH, 'r') as domain_file:
             content = domain_file.read()
-        return content  
+        return content
     else:
         return None  
-
 
 
 def read_from_file():
@@ -109,7 +136,7 @@ def save_to_file(data):
     protocol = data.get('protocol')
     lb_method = data.get('lb_method')
     backend_servers = data.get('backend_servers', [])
-    use_ssl = data.get('use_ssl', False)
+    use_ssl = data.get('use_ssl', '')
     ssl_cert_path = data.get('ssl_cert_path', '')
     domain_name = data.get('domain_name', '')
 
@@ -226,7 +253,18 @@ def delete_to_file(haproxy_name):
     # Write the updated configuration back to the file
     with open(CONFIG_FILE_PATH, 'w') as haproxy_cfg:
         haproxy_cfg.writelines(new_lines)
+    
+    ssl_folder_content = [
+        SSL_FILE_PATH,
+        DOMAIN_FILE_PATH
+    ]
 
+    for ssl in ssl_folder_content:
+        if os.path.exists(ssl):
+            os.remove(ssl)
+        else:
+            return 0
+        
     return f"Frontend '{haproxy_name}' and its associated backend have been deleted."
 
 
@@ -290,19 +328,36 @@ def index():
     if session.get('logged_in'):
         return '<script>alert("Akses dilarang"); window.location.href = "/home";</script>'
 
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
+    is_user = is_user_exist()
 
-        if username in users and check_password_hash(users[username], password):
+    if request.method == "POST":
+        data = request.get_json()
+
+        if not data or 'username' not in data or 'password' not in data:
+            return make_response('Missing credentials', 400)
+
+        username = data['username']
+        password = data['password']
+
+        # if username in is_user and is_user[username]['password'] == password:
+        if username in is_user and check_password_hash(is_user[username]['password'], password):
             session['logged_in'] = True
             session['username'] = username
-            return redirect(url_for("home"))  
+            token = jwt.encode({
+                'user': username,
+                'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=60)
+            },
+            app.config['SECRET_KEY'], algorithm="HS256")
 
+            return jsonify({
+                'message': True,
+                'token': token
+            })
         else:
-            flash("Invalid username or password", "danger") 
+            return jsonify({'message': False}), 401
 
     return render_template('index.html')
+
 
 @app.route("/home")
 def home():
@@ -315,10 +370,12 @@ def home():
 
     return render_template('home.html', frontend_port=frontend_port, layer7_count=layer7_count, layer4_count=layer4_count, haproxy_name=haproxy_name, modes=modes, lb_method=lb_method, backend_servers=backend_servers, haproxy_exists=haproxy_exists, domain_exists=domain_exists)
 
+
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('index'))
+
 
 @app.route("/add", methods=['GET', 'POST'])
 def add():
@@ -420,7 +477,7 @@ def edit(haproxy_name):
                 request.form.getlist('backend_server_ips'),
                 request.form.getlist('backend_server_ports')
             ))
-        
+            
             # Step 2: Delete the old configuration
             delete_to_file(haproxy_name)
 
@@ -489,17 +546,27 @@ def reset_password():
     if not session.get('logged_in'):
         return '<script>alert("Harus login dulu"); window.location.href = "/";</script>'
     
+    is_user = is_user_exist()
+    username = session.get('username')
+
+    if username not in is_user:
+        return '<script>alert("User tidak ditemukan"); window.location.href = "/";</script>'
+
     if request.method == 'POST':
         new_password = request.form.get('new_password')
         password_confirmation = request.form.get('password_confirmation')
-        username = session.get('username')
+
+        if not new_password or not password_confirmation:
+            return '<script>alert("Harap mengisi semua kolom password"); window.location.href = "/reset_password";</script>'
 
         if new_password == password_confirmation:
-            users[username] = generate_password_hash(new_password)
+            hashed_password = generate_password_hash(new_password)
+            is_user[username]['password'] = hashed_password
+            save_users(is_user)
             session.clear()
             return '<script>alert("Password berhasil direset"); window.location.href = "/";</script>'
         else:
-            return '<script>alert("Password gagal direset"); window.location.href = "/home";</script>'
+            return '<script>alert("Password tidak cocok"); window.location.href = "/reset_password";</script>'
     
     return render_template('reset_password.html')
 

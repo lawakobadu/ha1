@@ -58,7 +58,7 @@
                                         <div class="form-group">
                                             <div class="form-check">
                                                 <label class="form-check-label">
-                                                <i class="mdi mdi-lock"></i><input type="checkbox" class="form-check-input" id="ssl_checkbox" name="ssl_checkbox" {% if use_ssl %} checked {% endif %}> Use SSL Certificate </label>
+                                                <i class="mdi mdi-lock"></i><input type="checkbox" class="form-check-input" id="ssl_checkbox" name="ssl_checkbox" {% if ssl_cert_path %} checked {% endif %}> Use SSL Certificate </label>
                                             </div>
                                         </div>
                                         <div class="ssl_fields" id="ssl_fields" style="display: none;">
@@ -96,7 +96,10 @@
                                         </div>
                                         <div class="lb_fields" id="lb_fields" style="display: none;">
                                             {% for server, counts in backend_servers  %}
-                                                <div class="form-group row">
+                                                <div class="form-group row g-3 align-items-end">
+                                                    <div class="col-auto">
+                                                        <button type="button" class="btn btn-danger rounded-circle" id="deleteButton" onclick="deleterow(this)" style="--bs-btn-padding-y: 2px; --bs-btn-padding-x: 2px; --bs-btn-font-size: .75rem; transform: translateY(-10px);"><i class="mdi mdi-minus text-white"></i></button>
+                                                    </div>
                                                     <div class="col">
                                                         <label for="exampleInputName1">Server {{ counts }} Name</label>
                                                         <input type="text" class="form-control" id="exampleInputName1" placeholder="Server {{ counts }} Name" name="backend_server_names" value="{{ server['name'] }}">
@@ -105,11 +108,11 @@
                                                         <label for="exampleInputName2">IP Address</label>
                                                         <input type="text" class="form-control" id="exampleInputName2" placeholder="IP Address" name="backend_server_ips" value="{{ server['ip'] }}">
                                                     </div>
-                                                    <div class="col-3">
+                                                    <div class="col-2">
                                                         <label for="exampleInputName3">Port </label>
                                                         <input type="number" class="form-control" id="exampleInputName3" placeholder="Port" name="backend_server_ports" value="{{ server['port'] }}">
                                                     </div>
-                                                    <div class="col-2" id="weight_field" style="display: none;">
+                                                    <div class="col-1" id="weight_field" style="display: none;">
                                                         <label for="exampleInputName4">Weight</label>
                                                         <input type="number" class="form-control" id="exampleInputName4" placeholder="Weight" name="backend_server_weights" value="{{ server['weight'] }}">
                                                     </div>
@@ -142,14 +145,30 @@
 
         // Function to toggle SSL fields
         document.addEventListener('DOMContentLoaded', function () {
-            document.getElementById('ssl_checkbox').addEventListener('change', function () {
-                document.getElementById('ssl_fields').style.display = this.checked ? 'block' : 'none';
-            });
-        });
+            var sslCheckbox = document.getElementById('ssl_checkbox');
+            var sslFields = document.getElementById('ssl_fields');
 
-        document.addEventListener('DOMContentLoaded', function () {
+            // Function to update ssl_fields display based on checkbox state
+            function updateSslFields() {
+                sslFields.style.display = sslCheckbox.checked ? 'block' : 'none';
+            }
+
+            // Set initial display of ssl_fields based on checkbox state
+            updateSslFields();
+
+            // Add event listener to update display when checkbox state changes
+            sslCheckbox.addEventListener('change', updateSslFields);
+
+            // Call your protocol function if needed
             protocolFunction(); // Initial check based on current protocol value
         });
+
+        function deleterow(deleteButton) {
+            let row = deleteButton.closest('.form-group');  // Find the closest form-group row
+            row.remove();  // Remove the row
+            updateServerNumbers();  // Update the server numbers (you can define this function as needed)
+        }
+
     </script>
     <script> 
         let lbMethod = ""; // Variabel global untuk menyimpan pilihan lb_method
@@ -157,7 +176,7 @@
     
         function lbMethodFunction() {
             lbMethod = document.getElementById("lb_method").value;
-            let weightFields = document.querySelectorAll("#lb_fields .col-2");
+            let weightFields = document.querySelectorAll("#lb_fields .col-1");
             let lb_fields = document.getElementById("lb_fields");
             let addBackendBtn = document.getElementById("addBackendBtn");
 
@@ -180,10 +199,32 @@
         document.addEventListener('DOMContentLoaded', function(){
             lbMethodFunction();
         });
-    
+
         function addBackend() {
             // Menambah counter untuk label backend server
             backendCounter++;
+
+            var deleteButton = document.createElement("button");
+            deleteButton.setAttribute("type", "button");
+            deleteButton.className = "btn btn-danger rounded-circle";
+            deleteButton.style.cssText = "--bs-btn-padding-y: 2px; --bs-btn-padding-x: 2px; --bs-btn-font-size: .75rem; transform: translateY(-10px);";
+
+            // Membuat elemen ikon di dalam button
+            var deleteIcon = document.createElement("i");
+            deleteIcon.className = "mdi mdi-minus text-white";
+
+            // Menambahkan ikon ke dalam button
+            deleteButton.appendChild(deleteIcon);
+
+            // Fungsi untuk menghapus row dan memperbarui nomor server
+            deleteButton.addEventListener("click", function() {
+                newRow.remove();
+                updateServerNumbers();
+            });
+
+            var colAuto = document.createElement("div");
+            colAuto.className = "col-auto";
+            colAuto.appendChild(deleteButton);
     
             // Membuat elemen label dan input untuk nama backend server
             var labelName = document.createElement("label");
@@ -230,13 +271,14 @@
             colIP.appendChild(y);
     
             var colPort = document.createElement("div");
-            colPort.className = "col-3";
+            colPort.className = "col-2";
             colPort.appendChild(labelPort);
             colPort.appendChild(z);
     
             // Membuat row baru dan menambahkan kolom ke dalamnya
             var newRow = document.createElement("div");
-            newRow.className = "form-group row";
+            newRow.className = "form-group row g-3 align-items-end";
+            newRow.appendChild(colAuto);
             newRow.appendChild(colName);
             newRow.appendChild(colIP);
             newRow.appendChild(colPort);
@@ -246,6 +288,7 @@
                 var labelWeight = document.createElement("label");
                 labelWeight.setAttribute("for", "exampleInputName" + backendCounter);
                 labelWeight.textContent = "Weight";
+                
                 var w = document.createElement("INPUT");
                 w.setAttribute("type", "number");
                 w.setAttribute("id", "exampleInputName" + backendCounter);
@@ -254,7 +297,7 @@
                 w.className = "form-control";
     
                 var colWeight = document.createElement("div");
-                colWeight.className = "col-2";
+                colWeight.className = "col-1";
                 colWeight.appendChild(labelWeight);
                 colWeight.appendChild(w);
     
@@ -264,6 +307,18 @@
             // Menambahkan row baru ke dalam container
             var container = document.getElementById("lb_fields");
             container.appendChild(newRow);
+        }
+
+        function updateServerNumbers() {
+            var rows = document.querySelectorAll("#lb_fields .form-group.row");
+            backendCounter = 0;
+            rows.forEach(function(row, index) {
+                backendCounter++;
+                var labelName = row.querySelector(".col label");
+                var inputName = row.querySelector(".col input");
+                labelName.textContent = "Server " + backendCounter + " Name";
+                inputName.setAttribute("placeholder", "Server " + backendCounter + " Name");
+            });
         }
     </script>  
         <!-- plugins:js -->
