@@ -19,7 +19,7 @@
         <!-- inject:css -->
         <link rel="stylesheet" href="{{url_for('static', filename='css/style.css')}}">
         <!-- endinject -->
-        <link rel="shortcut icon" href="{{url_for('static', filename='images/logo.png')}}" />
+        <link rel="shortcut icon" href="{{url_for('static', filename='images/logo_haproxy.png')}}" />
     </head>
     <body>
         <div class="container-scroller">
@@ -29,7 +29,8 @@
                 <div class="col-lg-4 mx-auto">
                   <div class="auth-form-light text-left py-5 px-4 px-sm-5">
                     <div class="brand-logo text-center">
-                      <img src="{{url_for('static', filename='images/logo.png')}}" alt="logo">
+                      <img src="{{url_for('static', filename='images/logo_haproxy.png')}}" alt="logo">
+                      <p class="text-center">v1.0</p>
                     </div>
                     <h4 class="font-weight-light text-center">Sign in to continue.</h4>
                     <form class="pt-3" method="POST">
@@ -56,5 +57,43 @@
         <script src="{{url_for('static', filename='js/template.js')}}"></script>
         <script src="{{url_for('static', filename='js/settings.js')}}"></script>
         <script src="{{url_for('static', filename='js/todolist.js')}}"></script>
+        <script>
+          function save(event) {
+              event.preventDefault(); // Prevent the form from submitting the traditional way
+  
+              const apiUrl = 'http://38.47.71.150:5000';
+              const postData = {
+                  username: document.getElementById('username').value,
+                  password: document.getElementById('password').value,
+              };
+  
+              const requestOptions = {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(postData)
+              };
+  
+              fetch(apiUrl, requestOptions)
+                  .then(response => {
+                      if (!response.ok) {
+                          throw new Error(`HTTP error! Status: ${response.status}`);
+                      }
+                      return response.json();
+                  })
+                  .then(data => {
+                      if (data.message) {
+                          window.location.href = "/home"; // Redirect to home page
+                      } else {
+                          alert("Login failed");
+                      }
+                  })
+                  .catch(error => {
+                      console.error('Error:', error);
+                      alert("Login failed");
+                  });
+          }
+      </script>
       </body>
 </html>

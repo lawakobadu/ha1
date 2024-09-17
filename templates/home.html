@@ -21,7 +21,7 @@
     <!-- inject:css -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <!-- endinject -->
-    <link rel="shortcut icon" href="{{ url_for('static', filename='images/logo.png') }}" />
+    <link rel="shortcut icon" href="{{ url_for('static', filename='images/logo_haproxy.png') }}" />
 </head>
 <body>
     <div class="container-scroller">
@@ -40,45 +40,66 @@
                             </div>
                         </div>
                     </div>
-                    {% if not haproxy_exists  %}
+
                     <a class="btn btn-primary me-2 mb-xl-4" href="{{ url_for('add') }}">Add HAProxy</a>
-                    {% endif %}
+                    
                     <div class="row">
                         <div class="col-md-12 grid-margin stretch-card">
-                            <div class="card position-relative">
+                            <div class="card">
                                 <div class="card-body">
-                                    <div id="detailedReports" class="carousel slide detailed-report-carousel position-static pt-2" data-bs-ride="carousel">
-                                        <div class="carousel-inner">
-                                            <div class="carousel-item {% if haproxy_exists %}active{% endif %}">
-                                                <h2 class="text-primary mb-xl-4">{{ haproxy_name }}</h2>
-                                                <h4 class="font-weight-500 mb-xl-3"><i class="mdi mdi-import"></i><span class="mx-2">Port :</span>{{ frontend_port }}</h4>
-                                                <h4 class="font-weight-500 mb-xl-3"><i class="mdi mdi-webhook"></i>{% for mode in modes %}<span class="mx-2">Mode : {{ mode }}</span>{% endfor %}</h4>
-                                                <h4 class="font-weight-500 mb-xl-3"><i class="mdi mdi-star"></i><span class="mx-2">Algorithm :</span>
-                                                {% if lb_method == 'roundrobin' %}
-                                                    Round Robin
-                                                {% elif lb_method == 'source' %}
-                                                    IP Hash
-                                                {% elif lb_method == 'leastconn' %}
-                                                    Least Connection
-                                                {% else %}
-                                                    {{ lb_method }}
-                                                {% endif %}
-                                                </h4>
-                                                {% for server_name, server_ip in backend_servers %}
-                                                <h4 class="font-weight-500 mb-xl-3"><i class="mdi mdi-server"></i><span class="mx-2">{{ server_name }}</span>{{ server_ip }}</h4>
-                                                {% endfor %}
-                                                <h4 class="font-weight-500 mb-xl-3">link : 
-                                                    <a target="_blank" href="{% if domain_exists %}https://{{ domain_exists }}{% else %}http://{{ request.host.split(':')[0] }}{% endif %}">
-                                                        {% if domain_exists %}{{ domain_exists }}{% else %}{{ request.host.split(':')[0] }}{% endif %}
-                                                    </a>
-                                                </h4>
-                                                <a class="btn btn-warning font-weight-500 mb-xl-4" href="{{ url_for('edit', haproxy_name=haproxy_name) }}">Edit HAProxy</a>
-                                                <form action="/delete" method="POST" style="display: inline;">
-                                                    <input type="hidden" name="haproxy_name" value="{{ haproxy_name }}">
-                                                    <button type="submit" class="btn btn-danger font-weight-500 mb-xl-4" name="save_reload_delete" onclick="return confirm('Are you sure you want to delete this configuration?');">
-                                                        Delete HAProxy
-                                                    </button>
-                                                </form>                                                    
+                                    <p class="card-title">HAProxy Table</p>
+                                    <div class="row">
+                                        <div class="col-12">
+                                            <div class="table-responsive">
+                                                <table id="example" class="display expandable-table" style="width:100%">
+                                                    <thead>
+                                                      <tr>
+                                                        <th>No.</th>
+                                                        <th>Name</th>
+                                                        <th>Mode</th>
+                                                        <th>Port</th>
+                                                        <th>Algoritma</th>
+                                                        <th>SSL</th>
+                                                        <th>Status</th>
+                                                        <th>URL</th>
+                                                        <th>Action</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                      {% for haproxy in haproxy_data %}
+                                                      <tr>
+                                                          <td>{{ loop.index }}</td>
+                                                          <td>{{ haproxy.haproxy_name }}</td>
+                                                          <td>{{ haproxy.modes | join(', ') }}</td>
+                                                          <td>{{ haproxy.frontend_port }}</td>
+                                                          <td>
+                                                              {% if haproxy.lb_method == 'roundrobin' %}
+                                                                  Round Robin
+                                                              {% elif haproxy.lb_method == 'source' %}
+                                                                  IP Hash
+                                                              {% elif haproxy.lb_method == 'leastconn' %}
+                                                                  Least Connection
+                                                              {% else %}
+                                                                  {{ haproxy.lb_method }}
+                                                              {% endif %}
+                                                          </td>
+                                                          <td>Manual</td>
+                                                          <td>Active</td>
+                                                          <td>
+                                                            <a target="_blank" href="{% if domain_exists %}https://{{ domain_exists }}{% else %}http://{{ request.host.split(':')[0] }}{% endif %}">
+                                                                {% if domain_exists %}{{ domain_exists }}{% else %}{{ request.host.split(':')[0] }}{% endif %}
+                                                            </a>
+                                                          </td>
+                                                          <td>
+                                                              <a class="btn btn-warning btn-sm" href="{{ url_for('edit', haproxy_name=haproxy.haproxy_name) }}">Edit</a> |
+                                                              <form action="{{ url_for('delete', haproxy_name=haproxy.haproxy_name) }}" method="post" style="display: inline;">
+                                                                  <button type="submit" class="btn btn-danger btn-sm" name="save_reload_delete" onclick="return confirm('Are you sure you want to delete this configuration?');">Delete</button>
+                                                              </form>
+                                                          </td>
+                                                      </tr>
+                                                      {% endfor %}
+                                                    </tbody>
+                                                </table>
                                             </div>
                                         </div>
                                     </div>
@@ -110,3 +131,47 @@
     <script src="{{ url_for('static', filename='/js/dashboard.js') }}"></script>
 </body>
 </html>
+
+<!-- <div class="row">
+    <div class="col-md-12 grid-margin stretch-card">
+        <div class="card position-relative">
+            <div class="card-body">
+                <div id="detailedReports" class="carousel slide detailed-report-carousel position-static pt-2" data-bs-ride="carousel">
+                    <div class="carousel-inner">
+                        <div class="carousel-item {% if haproxy_exists %}active{% endif %}">
+                            <h2 class="text-primary mb-xl-4">{{ haproxy_name }}</h2>
+                            <h4 class="font-weight-500 mb-xl-3"><i class="mdi mdi-import"></i><span class="mx-2">Port :</span>{{ frontend_port }}</h4>
+                            <h4 class="font-weight-500 mb-xl-3"><i class="mdi mdi-webhook"></i>{% for mode in modes %}<span class="mx-2">Mode : {{ mode }}</span>{% endfor %}</h4>
+                            <h4 class="font-weight-500 mb-xl-3"><i class="mdi mdi-star"></i><span class="mx-2">Algorithm :</span>
+                            {% if lb_method == 'roundrobin' %}
+                                Round Robin
+                            {% elif lb_method == 'source' %}
+                                IP Hash
+                            {% elif lb_method == 'leastconn' %}
+                                Least Connection
+                            {% else %}
+                                {{ lb_method }}
+                            {% endif %}
+                            </h4>
+                            {% for server_name, server_ip in backend_servers %}
+                            <h4 class="font-weight-500 mb-xl-3"><i class="mdi mdi-server"></i><span class="mx-2">{{ server_name }}</span>{{ server_ip }}</h4>
+                            {% endfor %}
+                            <h4 class="font-weight-500 mb-xl-3">link : 
+                                <a target="_blank" href="{% if domain_exists %}https://{{ domain_exists }}{% else %}http://{{ request.host.split(':')[0] }}{% endif %}">
+                                    {% if domain_exists %}{{ domain_exists }}{% else %}{{ request.host.split(':')[0] }}{% endif %}
+                                </a>
+                            </h4>
+                            <a class="btn btn-warning font-weight-500 mb-xl-4" href="{{ url_for('edit', haproxy_name=haproxy_name) }}">Edit HAProxy</a>
+                            <form action="/delete" method="POST" style="display: inline;">
+                                <input type="hidden" name="haproxy_name" value="{{ haproxy_name }}">
+                                <button type="submit" class="btn btn-danger font-weight-500 mb-xl-4" name="save_reload_delete" onclick="return confirm('Are you sure you want to delete this configuration?');">
+                                    Delete HAProxy
+                                </button>
+                            </form>                                                    
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div> -->
