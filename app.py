@@ -11,21 +11,32 @@ app.secret_key = 'f7d3814dd7f44e6ab8ff23c98a92c7fc'
 
 # Path ke file konfigurasi HAProxy di dalam folder static
 CONFIG_FILE_PATH = ('/etc/haproxy/haproxy.cfg')
-SSL_FILE_PATH = ('/etc/haproxy-dashboard/ssl/key.pem')
-DOMAIN_FILE_PATH = ('/etc/haproxy-dashboard/ssl/domain.txt')
+SSL_FILE_PATH = '/etc/haproxy-dashboard/ssl/key'
+DOMAIN_FILE_PATH = '/etc/haproxy-dashboard/ssl/domain'
 USER_FILE_PATH = ('/etc/haproxy-dashboard/admin/user.json')
 
+# Ensure both directories exist
+for directory in [SSL_FILE_PATH, DOMAIN_FILE_PATH]:
+    if not os.path.exists(directory):
+        os.makedirs(directory)
 
-def certificate(content):
-    with open(SSL_FILE_PATH, 'w') as file:
+
+def certificate(file_name, content):
+    if not os.path.exists(SSL_FILE_PATH):
+        os.makedirs(SSL_FILE_PATH)
+    full_file_path = os.path.join(SSL_FILE_PATH, file_name)
+    with open(full_file_path, 'w') as file:
         file.write(content)
-    return f"{SSL_FILE_PATH}"
+    return f"{full_file_path}.pem"
 
 
-def domain(domain_content):
-    with open(DOMAIN_FILE_PATH, 'w') as file:
+def domain(file_name, domain_content):
+    if not os.path.exists(DOMAIN_FILE_PATH):
+        os.makedirs(DOMAIN_FILE_PATH)
+    full_file_path = os.path.join(DOMAIN_FILE_PATH, file_name)
+    with open(full_file_path, 'w') as file:
         file.write(domain_content)
-    return f"{DOMAIN_FILE_PATH}"
+    return f"{full_file_path}.txt"
 
 
 def is_user_exist():
@@ -62,13 +73,23 @@ def is_haproxy_exist():
     return False
 
 
-def is_domain_exist():
-    if os.path.exists(DOMAIN_FILE_PATH):
-        with open(DOMAIN_FILE_PATH, 'r') as domain_file:
-            content = domain_file.read()
-        return content
-    else:
-        return None  
+# def get_all_domains(haproxy_name):
+#     data = []
+#     for domain_file in os.listdir(DOMAIN_FILE_PATH):
+#         if domain_file.endswith('.txt'):
+#             file_path = os.path.join(DOMAIN_FILE_PATH, domain_file)
+#             with open(file_path, 'r') as file:
+#                 lines = file.readlines()
+#                 for line in lines:
+#                     if line.startswith('haproxy_name'):
+#                         name_in_file = line.split(' ')[1].strip()  # Ambil nama haproxy
+#                         return name_in_file
+#     return None
+
+
+def sanitize_filename(domain_name):
+    # Bersihkan karakter yang tidak diizinkan dalam nama file
+    return re.sub(r'[^\w\-_\.]', '_', domain_name)
 
 
 def read_from_file(haproxy_names):
@@ -88,8 +109,8 @@ def read_from_file(haproxy_names):
         pattern_backend_servers_weight = re.compile(r'server\s+(\w+)\s+([\d.]+:\d+)\s+weight\s+(\d+)\s+check')
         pattern_backend_servers_no_weight = re.compile(r'server\s+(\w+)\s+([\d.]+:\d+)\s+check')
 
-        print("frontend_matches:", frontend_matches)
-        print("backend_matches:", backend_matches)
+        # print("frontend_matches:", frontend_matches)
+        # print("backend_matches:", backend_matches)
 
         for match in frontend_matches:
             haproxy_name = match[0].strip()
@@ -140,7 +161,7 @@ def read_from_file(haproxy_names):
                         'backend_servers': list(zip(backend_servers, range(1, len(backend_servers) + 1)))
                     })
 
-                    print(f"Data for {haproxy_name}: {data[-1]}")
+                    # print(f"Data for {haproxy_name}: {data[-1]}")
 
     return data
 
@@ -157,9 +178,12 @@ def save_to_file(data):
 
     # Write SSL certificate to file if provided
     if use_ssl and ssl_cert_path:
-        with open(SSL_FILE_PATH, 'w') as cert_file:
-            cert_file.write(ssl_cert_path)
-        with open(DOMAIN_FILE_PATH, 'w') as domain_file:
+        cert_file_name = f"{haproxy_name}.pem"
+        certificate(cert_file_name, ssl_cert_path)
+
+        file_domain_path = os.path.join(DOMAIN_FILE_PATH, f"{sanitize_filename(haproxy_name)}.txt")
+
+        with open(file_domain_path, 'a') as domain_file:
             domain_file.write(domain_name)
 
     # Write HAProxy configuration
@@ -184,14 +208,14 @@ def save_to_file(data):
         # Bind and protocol configurations
         if protocol == 'tcp':
             if use_ssl:
-                haproxy_cfg.write(f"        bind *:{frontend_port} ssl crt /etc/haproxy-dashboard/ssl/key.pem\n")
+                haproxy_cfg.write(f"        bind *:{frontend_port} ssl crt /etc/haproxy-dashboard/ssl/key/{haproxy_name}.pem\n")
                 haproxy_cfg.write(f"        redirect scheme https code 301 if !{{ ssl_fc }}\n")
             else:
                 haproxy_cfg.write(f"        bind *:{frontend_port}\n")
             haproxy_cfg.write(f"        mode tcp\n")
         elif protocol == 'http':
             if use_ssl:
-                haproxy_cfg.write(f"        bind *:443 ssl crt /etc/haproxy-dashboard/ssl/key.pem\n")
+                haproxy_cfg.write(f"        bind *:443 ssl crt /etc/haproxy-dashboard/ssl/key/{haproxy_name}.pem\n")
                 haproxy_cfg.write(f"        redirect scheme https code 301 if !{{ ssl_fc }}\n")
             else:
                 haproxy_cfg.write(f"        bind *:80\n")
@@ -218,7 +242,7 @@ def save_to_file(data):
     return {'success': True, 'message': "Frontend and Backend added successfully."}
 
 
-def delete_to_file(haproxy_name):
+def delete_conf(haproxy_name):
     with open(CONFIG_FILE_PATH, 'r') as haproxy_cfg:
         lines = haproxy_cfg.readlines()
 
@@ -291,18 +315,9 @@ def delete_to_file(haproxy_name):
     # Write the updated configuration back to the file
     with open(CONFIG_FILE_PATH, 'w') as haproxy_cfg:
         haproxy_cfg.writelines(new_lines)
-    
-    ssl_folder_content = [
-        SSL_FILE_PATH,
-        DOMAIN_FILE_PATH
-    ]
-
-    # Only delete the files if they exist, do not return error
-    for ssl in ssl_folder_content:
-        if os.path.exists(ssl):
-            os.remove(ssl)
 
     return f"Frontend '{haproxy_name}' and its associated backend have been deleted."
+
 
 def haproxy_info():
     haproxy_data = []
@@ -423,24 +438,38 @@ def index():
     return render_template('index.html')
 
 
-@app.route("/home")
+def get_all_domains(haproxy_name):
+    domain_file_path = os.path.join(DOMAIN_FILE_PATH, f"{haproxy_name}.txt")
+    if os.path.exists(domain_file_path):
+        with open(domain_file_path, 'r') as file:
+            content = file.read()
+        return content
+    else:
+        return None
+
+
+@app.route("/home", methods=['GET', 'POST'])
 def home():
     if not session.get('logged_in'):
         return '<script>alert("Harus login dulu"); window.location.href = "/";</script>'
-
-    # frontend_port, layer7_count, layer4_count, haproxy_name, modes, lb_method, backend_servers = haproxy_info()
+    
+    haproxy_name = request.args.get('haproxy_name')
+    file_name = request.args.get('file_name')
+    
     haproxy_data, layer7_count, layer4_count = haproxy_info()
-    domain_exists = is_domain_exist()
+    domains = get_all_domains(haproxy_name)
+    print(f"list domain : {domains}")
     haproxy_exists = is_haproxy_exist()
+
     return render_template(
         'home.html', 
         haproxy_data=haproxy_data, 
         haproxy_exists=haproxy_exists, 
-        domain_exists=domain_exists,
+        domains=domains,
         layer7_count=layer7_count,
-        layer4_count=layer4_count
+        layer4_count=layer4_count,
+        file_name=file_name
     )
-    # return render_template('home.html', frontend_port=frontend_port, layer7_count=layer7_count, layer4_count=layer4_count, haproxy_name=haproxy_name, modes=modes, lb_method=lb_method, backend_servers=backend_servers, haproxy_exists=haproxy_exists, domain_exists=domain_exists)
 
 
 @app.route('/logout')
@@ -505,7 +534,7 @@ def add():
     return render_template('HAProxy/add.html')
 
 
-@app.route("/edit/<string:haproxy_name>", methods=['GET', 'POST'])
+@app.route("/edit/<haproxy_name>", methods=['GET', 'POST'])
 def edit(haproxy_name):
     if not session.get('logged_in'):
         return '<script>alert("Harus login dulu"); window.location.href = "/";</script>'
@@ -521,8 +550,11 @@ def edit(haproxy_name):
             # Step 1: Get data from the form
             ssl_cert_content = request.form.get('ssl_cert_path', '')
             domain_name_content = request.form.get('domain_name', '')
-            certificate(ssl_cert_content)
-            domain(domain_name_content)
+            if ssl_cert_content:
+                certificate(f"{haproxy_name}.pem", ssl_cert_content)
+            if domain_name_content:
+                domain(f"{haproxy_name}.txt", domain_name_content)
+                
             item.update({
                 'haproxy_name': request.form['haproxy_name'],
                 'frontend_port': request.form['frontend_port'],
@@ -548,7 +580,7 @@ def edit(haproxy_name):
             ))
             
             # Step 2: Delete the old configuration
-            delete_to_file(haproxy_name)
+            delete_conf(haproxy_name)
 
             # Step 3: Save the new configuration to the file
             save_to_file(item)
@@ -568,43 +600,60 @@ def edit(haproxy_name):
 
             return redirect(url_for('home'))
 
-    ssl_cert_content = ''
-    if os.path.exists(SSL_FILE_PATH):
-        with open(SSL_FILE_PATH, 'r') as file:
+    ssl_cert_file = os.path.join(SSL_FILE_PATH, f"{haproxy_name}.pem")
+    domain_file = os.path.join(DOMAIN_FILE_PATH, f"{haproxy_name}.txt")
+
+    if os.path.isfile(ssl_cert_file):
+        with open(ssl_cert_file, 'r') as file:
             ssl_cert_content = file.read()
     
-    domain_name_content = ''
-    if os.path.exists(DOMAIN_FILE_PATH):
-        with open(DOMAIN_FILE_PATH, 'r') as file:
+    if os.path.isfile(domain_file):
+        with open(domain_file, 'r') as file:
             domain_name_content = file.read()
             
     return render_template('HAProxy/edit.html', **item, ssl_cert_path=ssl_cert_content, domain_name=domain_name_content)
 
 
-@app.route("/delete/<string:haproxy_name>", methods=['POST'])
-def delete(haproxy_name):
-    if request.method == 'POST':
+@app.route("/delete/<haproxy_name>/<file_name>", methods=['POST'])
+def delete(haproxy_name, file_name):
+    # print(f'Deleting HAProxy: {haproxy_name}, File: {file_name}')
+    delete_conf(haproxy_name)
 
-        delete_to_file(haproxy_name)  # Use custom function to save the updated data
+    key_file = os.path.join(SSL_FILE_PATH, file_name + ".pem")
+    domain_file = os.path.join(DOMAIN_FILE_PATH, file_name + ".txt")
+    # print(f'Key file: {key_file}, Domain file: {domain_file}')
 
-        # Check if the save_reload_delete button was pressed
-        if 'save_reload_delete' in request.form:
-            # Validate HAProxy configuration
-            check_result = subprocess.run(['haproxy', '-c', '-f', CONFIG_FILE_PATH], capture_output=True, text=True)
-            check_output = check_result.stdout
+    if os.path.exists(key_file):
+        os.remove(key_file)
+    else:
+        flash(f'PEM file "{file_name}.pem" not found!', 'error')
+    
+    if os.path.exists(domain_file):
+        os.remove(domain_file)
+    else:
+        flash(f'TXT file "{file_name}.txt" not found!', 'error')
 
-            if check_result.returncode != 0:
-                error_message = check_result.stderr
-                check_output += f"\n\nError occurred:\n{error_message}"
-                flash('Configuration validation failed. See details below.', 'error')
-                return render_template('home.html', check_output=check_output)
+    if not os.path.exists(key_file) and not os.path.exists(domain_file):
+        flash(f'Files "{file_name}.txt" and "{file_name}.pem" successfully deleted!', 'success')
 
-            # Restart HAProxy if validation succeeds
-            reload_result = subprocess.run(['systemctl', 'restart', 'haproxy'], capture_output=True, text=True)
-            check_output += f"\n\nHAProxy Restart Output:\n{reload_result.stdout}"
+    # Check if the save_reload_delete button was pressed
+    if 'save_reload_delete' in request.form:
+        # Validate HAProxy configuration
+        check_result = subprocess.run(['haproxy', '-c', '-f', CONFIG_FILE_PATH], capture_output=True, text=True)
+        check_output = check_result.stdout
 
-            flash('Configuration deleted and HAProxy has been restarted!', 'success')
+        if check_result.returncode != 0:
+            error_message = check_result.stderr
+            check_output += f"\n\nError occurred:\n{error_message}"
+            flash('Configuration validation failed. See details below.', 'error')
             return redirect(url_for('home'))
+
+        # Restart HAProxy if validation succeeds
+        reload_result = subprocess.run(['systemctl', 'restart', 'haproxy'], capture_output=True, text=True)
+        check_output += f"\n\nHAProxy Restart Output:\n{reload_result.stdout}"
+
+        flash('Configuration deleted and HAProxy has been restarted!', 'success')
+        return redirect(url_for('home'))
 
     return render_template('home.html')
 

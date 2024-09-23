@@ -67,36 +67,48 @@
                                                     </thead>
                                                     <tbody>
                                                       {% for haproxy in haproxy_data %}
-                                                      <tr>
-                                                          <td>{{ loop.index }}</td>
-                                                          <td>{{ haproxy.haproxy_name }}</td>
-                                                          <td>{{ haproxy.modes | join(', ') }}</td>
-                                                          <td>{{ haproxy.frontend_port }}</td>
-                                                          <td>
-                                                              {% if haproxy.lb_method == 'roundrobin' %}
-                                                                  Round Robin
-                                                              {% elif haproxy.lb_method == 'source' %}
-                                                                  IP Hash
-                                                              {% elif haproxy.lb_method == 'leastconn' %}
-                                                                  Least Connection
-                                                              {% else %}
-                                                                  {{ haproxy.lb_method }}
-                                                              {% endif %}
-                                                          </td>
-                                                          <td>Manual</td>
-                                                          <td>Active</td>
-                                                          <td>
-                                                            <a target="_blank" href="{% if domain_exists %}https://{{ domain_exists }}{% else %}http://{{ request.host.split(':')[0] }}{% endif %}">
-                                                                {% if domain_exists %}{{ domain_exists }}{% else %}{{ request.host.split(':')[0] }}{% endif %}
-                                                            </a>
-                                                          </td>
-                                                          <td>
-                                                              <a class="btn btn-warning btn-sm" href="{{ url_for('edit', haproxy_name=haproxy.haproxy_name) }}">Edit</a> |
-                                                              <form action="{{ url_for('delete', haproxy_name=haproxy.haproxy_name) }}" method="post" style="display: inline;">
-                                                                  <button type="submit" class="btn btn-danger btn-sm" name="save_reload_delete" onclick="return confirm('Are you sure you want to delete this configuration?');">Delete</button>
-                                                              </form>
-                                                          </td>
-                                                      </tr>
+                                                        <tr>
+                                                            <td>{{ loop.index }}</td>
+                                                            <td>{{ haproxy.haproxy_name }}</td>
+                                                            <td>{{ haproxy.modes | join(', ') }}</td>
+                                                            <td>{{ haproxy.frontend_port }}</td>
+                                                            <td>
+                                                                {% if haproxy.lb_method == 'roundrobin' %}
+                                                                    Round Robin
+                                                                {% elif haproxy.lb_method == 'source' %}
+                                                                    IP Hash
+                                                                {% elif haproxy.lb_method == 'leastconn' %}
+                                                                    Least Connection
+                                                                {% else %}
+                                                                    {{ haproxy.lb_method }}
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>Manual</td>
+                                                            <td>Active</td>
+                                                            <td>
+                                                                {% if domains %}
+                                                                    {% for domain in domains %}
+                                                                        <a name="domain_name" target="_blank" href="https://{{ domain }}">
+                                                                            {{ domain }}
+                                                                        </a><br>
+                                                                    {% endfor %}
+                                                                {% else %}
+                                                                    {% if haproxy_name %}
+                                                                        No domains found for {{ haproxy_name }}
+                                                                    {% else %}
+                                                                        <a name="domain_name" target="_blank" href="http://{{ request.host.split(':')[0] }}">
+                                                                            {{ request.host.split(':')[0] }}
+                                                                        </a>
+                                                                    {% endif %}
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>
+                                                                <a class="btn btn-warning btn-sm" href="{{ url_for('edit', haproxy_name=haproxy.haproxy_name) }}" name="save_reload_update">Edit</a> |
+                                                                <form action="{{ url_for('delete', haproxy_name=haproxy.haproxy_name, file_name=haproxy.haproxy_name) }}" method="post" style="display: inline;">
+                                                                    <button type="submit" class="btn btn-danger btn-sm" name="save_reload_delete" onclick="return confirm('Are you sure you want to delete this configuration?');">Delete</button>
+                                                                </form>
+                                                            </td>
+                                                        </tr>
                                                       {% endfor %}
                                                     </tbody>
                                                 </table>
