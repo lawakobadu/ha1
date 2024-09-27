@@ -11,14 +11,8 @@ app.secret_key = 'f7d3814dd7f44e6ab8ff23c98a92c7fc'
 
 # Path ke file konfigurasi HAProxy di dalam folder static
 CONFIG_FILE_PATH = ('/etc/haproxy/haproxy.cfg')
-SSL_FILE_PATH = '/etc/haproxy-dashboard/ssl/key'
-DOMAIN_FILE_PATH = '/etc/haproxy-dashboard/ssl/domain'
+SSL_FILE_PATH = ('/etc/haproxy-dashboard/ssl/')
 USER_FILE_PATH = ('/etc/haproxy-dashboard/admin/user.json')
-
-# Ensure both directories exist
-for directory in [SSL_FILE_PATH, DOMAIN_FILE_PATH]:
-    if not os.path.exists(directory):
-        os.makedirs(directory)
 
 
 def certificate(file_name, content):
@@ -28,15 +22,6 @@ def certificate(file_name, content):
     with open(full_file_path, 'w') as file:
         file.write(content)
     return f"{full_file_path}.pem"
-
-
-def domain(file_name, domain_content):
-    if not os.path.exists(DOMAIN_FILE_PATH):
-        os.makedirs(DOMAIN_FILE_PATH)
-    full_file_path = os.path.join(DOMAIN_FILE_PATH, file_name)
-    with open(full_file_path, 'w') as file:
-        file.write(domain_content)
-    return f"{full_file_path}.txt"
 
 
 def is_user_exist():
@@ -73,51 +58,34 @@ def is_haproxy_exist():
     return False
 
 
-# def get_all_domains(haproxy_name):
-#     data = []
-#     for domain_file in os.listdir(DOMAIN_FILE_PATH):
-#         if domain_file.endswith('.txt'):
-#             file_path = os.path.join(DOMAIN_FILE_PATH, domain_file)
-#             with open(file_path, 'r') as file:
-#                 lines = file.readlines()
-#                 for line in lines:
-#                     if line.startswith('haproxy_name'):
-#                         name_in_file = line.split(' ')[1].strip()  # Ambil nama haproxy
-#                         return name_in_file
-#     return None
-
-
-def sanitize_filename(domain_name):
-    # Bersihkan karakter yang tidak diizinkan dalam nama file
-    return re.sub(r'[^\w\-_\.]', '_', domain_name)
-
-
 def read_from_file(haproxy_names):
     data = []
     with open(CONFIG_FILE_PATH, 'r') as f:
         content = f.read().strip()
 
-        # Pola regex untuk frontend
-        pattern_frontend = re.compile(r'frontend\s+(\S+)\s+.*?bind\s+(\S+):(\d+).*?\n\s+mode\s+(\S+).*?\n\s+default_backend\s+(\S+)', re.DOTALL)
+        # Gabungan regex frontend dengan dan tanpa SSL
+        pattern_frontend = re.compile(
+            r'frontend\s+(\S+)\s+.*?bind\s+(\S+):(\d+).*?(?:\n\s+#\s+domain_name\s+(\S+))?\s*\n\s+mode\s+(\S+).*?\n\s+default_backend\s+(\S+)', 
+            re.DOTALL
+        )
         frontend_matches = pattern_frontend.findall(content)
+        print("frontend_matches : ", frontend_matches)
 
         # Pola regex untuk backend
         pattern_backend = re.compile(r'backend\s+(\S+)\s+balance\s+(\S+)(.*?)(?=\nfrontend|\Z)', re.DOTALL)
         backend_matches = pattern_backend.findall(content)
 
-        # Memetakan backend ke server-servernya
+        # Pola regex untuk server dengan dan tanpa weight
         pattern_backend_servers_weight = re.compile(r'server\s+(\w+)\s+([\d.]+:\d+)\s+weight\s+(\d+)\s+check')
         pattern_backend_servers_no_weight = re.compile(r'server\s+(\w+)\s+([\d.]+:\d+)\s+check')
-
-        # print("frontend_matches:", frontend_matches)
-        # print("backend_matches:", backend_matches)
 
         for match in frontend_matches:
             haproxy_name = match[0].strip()
             if haproxy_name == haproxy_names:
                 frontend_port = match[2].strip()
-                protocol = match[3].strip()
-                backend_name = match[4].strip()
+                domain_name = match[3].strip()  # Default IP jika domain_name tidak ada
+                protocol = match[4].strip()
+                backend_name = match[5].strip()
 
                 # Cari backend yang sesuai dengan default_backend dari frontend
                 backend_data = next(
@@ -155,13 +123,12 @@ def read_from_file(haproxy_names):
                     data.append({
                         'haproxy_name': haproxy_name, 
                         'frontend_port': frontend_port, 
+                        'domain_name': domain_name, 
                         'protocol': protocol, 
                         'lb_method': lb_method, 
                         'count_server': len(backend_servers),
                         'backend_servers': list(zip(backend_servers, range(1, len(backend_servers) + 1)))
                     })
-
-                    # print(f"Data for {haproxy_name}: {data[-1]}")
 
     return data
 
@@ -176,22 +143,23 @@ def save_to_file(data):
     ssl_cert_path = data.get('ssl_cert_path', '')
     domain_name = data.get('domain_name', '')
 
+    # Read current configuration to check for existing frontends and ports
+    with open(CONFIG_FILE_PATH, 'r') as haproxy_cfg_read:
+        existing_config = haproxy_cfg_read.read()
+
+    # Check port if already used
+    if protocol == 'tcp' and f"bind *:{frontend_port}" in existing_config:
+        return {'success': False, 'message': f"Port {frontend_port} is already in use."}
+    elif protocol == 'http' and 'bind *:80' in existing_config and 'bind *:443' in existing_config:
+        return {'success': False, 'message': "Port 80 or 443 is already in use."}
+    
     # Write SSL certificate to file if provided
     if use_ssl and ssl_cert_path:
         cert_file_name = f"{haproxy_name}.pem"
         certificate(cert_file_name, ssl_cert_path)
 
-        file_domain_path = os.path.join(DOMAIN_FILE_PATH, f"{sanitize_filename(haproxy_name)}.txt")
-
-        with open(file_domain_path, 'a') as domain_file:
-            domain_file.write(domain_name)
-
     # Write HAProxy configuration
     with open(CONFIG_FILE_PATH, 'a') as haproxy_cfg:
-        # Read current configuration to check for 'listen stats'
-        with open(CONFIG_FILE_PATH, 'r') as haproxy_cfg_read:
-            existing_config = haproxy_cfg_read.read()
-
         # Stats configuration
         if 'listen stats' not in existing_config:
             haproxy_cfg.write(f"\nlisten stats\n")
@@ -201,22 +169,24 @@ def save_to_file(data):
             haproxy_cfg.write(f"        stats hide-version\n")
             haproxy_cfg.write(f"        stats uri /stats\n")
             haproxy_cfg.write(f"        stats realm Haproxy\\ Statistics\n")
-            
+
         # Frontend configuration
         haproxy_cfg.write(f"\nfrontend {haproxy_name}\n")
 
         # Bind and protocol configurations
         if protocol == 'tcp':
             if use_ssl:
-                haproxy_cfg.write(f"        bind *:{frontend_port} ssl crt /etc/haproxy-dashboard/ssl/key/{haproxy_name}.pem\n")
+                haproxy_cfg.write(f"        bind *:{frontend_port} ssl crt /etc/haproxy-dashboard/ssl/{haproxy_name}.pem\n")
                 haproxy_cfg.write(f"        redirect scheme https code 301 if !{{ ssl_fc }}\n")
+                haproxy_cfg.write(f"        # domain_name {domain_name}\n")
             else:
                 haproxy_cfg.write(f"        bind *:{frontend_port}\n")
             haproxy_cfg.write(f"        mode tcp\n")
         elif protocol == 'http':
             if use_ssl:
-                haproxy_cfg.write(f"        bind *:443 ssl crt /etc/haproxy-dashboard/ssl/key/{haproxy_name}.pem\n")
+                haproxy_cfg.write(f"        bind *:443 ssl crt /etc/haproxy-dashboard/ssl/{haproxy_name}.pem\n")
                 haproxy_cfg.write(f"        redirect scheme https code 301 if !{{ ssl_fc }}\n")
+                haproxy_cfg.write(f"        # domain_name {domain_name}\n")
             else:
                 haproxy_cfg.write(f"        bind *:80\n")
             haproxy_cfg.write(f"        mode http\n")
@@ -316,7 +286,7 @@ def delete_conf(haproxy_name):
     with open(CONFIG_FILE_PATH, 'w') as haproxy_cfg:
         haproxy_cfg.writelines(new_lines)
 
-    return f"Frontend '{haproxy_name}' and its associated backend have been deleted."
+    return {'success': True, 'message': f"Frontend '{haproxy_name}' and its associated backend have been deleted."}
 
 
 def haproxy_info():
@@ -328,6 +298,7 @@ def haproxy_info():
     backend_servers = []
     modes = set()
     haproxy_name = ''
+    domain_name = ''
     inside_frontend = False
     inside_backend = False
 
@@ -343,6 +314,7 @@ def haproxy_info():
                 if haproxy_name:
                     haproxy_data.append({
                         'haproxy_name': haproxy_name,
+                        'domain_name': domain_name,
                         'frontend_port': frontend_port,
                         'lb_method': lb_method,
                         'backend_servers': backend_servers,
@@ -351,6 +323,7 @@ def haproxy_info():
 
                 # Reset variabel untuk frontend baru
                 haproxy_name = line.split()[1]
+                domain_name = ''
                 frontend_port = ''
                 lb_method = ''
                 backend_servers = []
@@ -377,6 +350,10 @@ def haproxy_info():
                         layer7_count += 1
                     elif mode == 'tcp':
                         layer4_count += 1
+                
+                # Detect domain_name
+                if line.startswith('# domain_name'):
+                    domain_name = line.split()[2]
 
             # Handle backend settings
             if inside_backend:
@@ -393,6 +370,7 @@ def haproxy_info():
         if haproxy_name:
             haproxy_data.append({
                 'haproxy_name': haproxy_name,
+                'domain_name': domain_name,
                 'frontend_port': frontend_port,
                 'lb_method': lb_method,
                 'backend_servers': backend_servers,
@@ -438,34 +416,20 @@ def index():
     return render_template('index.html')
 
 
-def get_all_domains(haproxy_name):
-    domain_file_path = os.path.join(DOMAIN_FILE_PATH, f"{haproxy_name}.txt")
-    if os.path.exists(domain_file_path):
-        with open(domain_file_path, 'r') as file:
-            content = file.read()
-        return content
-    else:
-        return None
-
-
 @app.route("/home", methods=['GET', 'POST'])
 def home():
     if not session.get('logged_in'):
         return '<script>alert("Harus login dulu"); window.location.href = "/";</script>'
     
-    haproxy_name = request.args.get('haproxy_name')
     file_name = request.args.get('file_name')
     
     haproxy_data, layer7_count, layer4_count = haproxy_info()
-    domains = get_all_domains(haproxy_name)
-    print(f"list domain : {domains}")
     haproxy_exists = is_haproxy_exist()
 
     return render_template(
         'home.html', 
         haproxy_data=haproxy_data, 
         haproxy_exists=haproxy_exists, 
-        domains=domains,
         layer7_count=layer7_count,
         layer4_count=layer4_count,
         file_name=file_name
@@ -540,7 +504,6 @@ def edit(haproxy_name):
         return '<script>alert("Harus login dulu"); window.location.href = "/";</script>'
     
     ssl_cert_content = ''
-    domain_name_content = ''
 
     data = read_from_file(haproxy_name)
     item = next((d for d in data if d['haproxy_name'] == haproxy_name), None)
@@ -549,11 +512,8 @@ def edit(haproxy_name):
         if item:
             # Step 1: Get data from the form
             ssl_cert_content = request.form.get('ssl_cert_path', '')
-            domain_name_content = request.form.get('domain_name', '')
             if ssl_cert_content:
                 certificate(f"{haproxy_name}.pem", ssl_cert_content)
-            if domain_name_content:
-                domain(f"{haproxy_name}.txt", domain_name_content)
                 
             item.update({
                 'haproxy_name': request.form['haproxy_name'],
@@ -561,7 +521,7 @@ def edit(haproxy_name):
                 'protocol': request.form['protocol'],
                 'use_ssl': 'ssl_checkbox' in request.form,
                 'ssl_cert_path': ssl_cert_content,
-                'domain_name': domain_name_content,
+                'domain_name': request.form['domain_name'],
                 'lb_method': request.form['lb_method']
             })
 
@@ -601,17 +561,12 @@ def edit(haproxy_name):
             return redirect(url_for('home'))
 
     ssl_cert_file = os.path.join(SSL_FILE_PATH, f"{haproxy_name}.pem")
-    domain_file = os.path.join(DOMAIN_FILE_PATH, f"{haproxy_name}.txt")
 
     if os.path.isfile(ssl_cert_file):
         with open(ssl_cert_file, 'r') as file:
             ssl_cert_content = file.read()
     
-    if os.path.isfile(domain_file):
-        with open(domain_file, 'r') as file:
-            domain_name_content = file.read()
-            
-    return render_template('HAProxy/edit.html', **item, ssl_cert_path=ssl_cert_content, domain_name=domain_name_content)
+    return render_template('HAProxy/edit.html', **item, ssl_cert_path=ssl_cert_content)
 
 
 @app.route("/delete/<haproxy_name>/<file_name>", methods=['POST'])
@@ -620,21 +575,14 @@ def delete(haproxy_name, file_name):
     delete_conf(haproxy_name)
 
     key_file = os.path.join(SSL_FILE_PATH, file_name + ".pem")
-    domain_file = os.path.join(DOMAIN_FILE_PATH, file_name + ".txt")
-    # print(f'Key file: {key_file}, Domain file: {domain_file}')
 
     if os.path.exists(key_file):
         os.remove(key_file)
     else:
         flash(f'PEM file "{file_name}.pem" not found!', 'error')
     
-    if os.path.exists(domain_file):
-        os.remove(domain_file)
-    else:
-        flash(f'TXT file "{file_name}.txt" not found!', 'error')
-
-    if not os.path.exists(key_file) and not os.path.exists(domain_file):
-        flash(f'Files "{file_name}.txt" and "{file_name}.pem" successfully deleted!', 'success')
+    if not os.path.exists(key_file):
+        flash(f'Files "{file_name}.pem" successfully deleted!', 'success')
 
     # Check if the save_reload_delete button was pressed
     if 'save_reload_delete' in request.form:
