@@ -17,7 +17,7 @@ Sebelum memulai, pastikan Anda memiliki hal-hal berikut:
 - Python 3.x
 - Flask
 - HAProxy
-- Dependensi yang diperlukan (daftar dependensi di `requirements.txt`)
+- Certbot (serta dengan certificate)
 
 ## Instalasi
 
