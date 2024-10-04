@@ -50,15 +50,16 @@
                                                     <option value="tcp">TCP</option>
                                                     </select>
                                                 </div>
+                                                <small class="text-danger">*if only using http auto redirect port 80. if checklist ssl box, auto redirect port 443</small>
                                             </div>
                                             <div class="form-group" id="frontend_port_group" style="display: none;">
                                                 <label for="exampleInputNamePort">Frontend Port</label>
-                                                <input type="number" class="form-control" id="frontend_port" placeholder="Frontend Port" name="frontend_port">
+                                                <input type="text" class="form-control" id="frontend_port" placeholder="Frontend Port" name="frontend_port" oninput="validateIP(event)">
                                             </div>                                            
                                             <div class="form-group">
                                                 <div class="form-check">
                                                     <label class="form-check-label">
-                                                    <i class="mdi mdi-lock"></i><input type="checkbox" class="form-check-input" id="ssl_checkbox" name="ssl_checkbox"> Use SSL Certificate </label>
+                                                    <i class="mdi mdi-lock"></i><input type="checkbox" class="form-check-input" id="use_ssl" name="use_ssl"> Use SSL Certificate </label>
                                                 </div>
                                             </div>
                                             <div class="ssl_fields" id="ssl_fields" style="display: none;">
@@ -102,15 +103,15 @@
                                                 </div>
                                                 <div class="col">
                                                     <label for="exampleInputName2">IP Address</label>
-                                                    <input type="text" class="form-control" id="backend_server_ips" placeholder="IP Address" name="backend_server_ips">
+                                                    <input type="text" class="form-control" id="backend_server_ips" placeholder="IP Address" name="backend_server_ips" oninput="validateIP(event)">
                                                 </div>
                                                 <div class="col-2">
                                                     <label for="exampleInputName3">Port</label>
-                                                    <input type="number" class="form-control" id="backend_server_ports" placeholder="Port" name="backend_server_ports">
+                                                    <input type="text" class="form-control" id="backend_server_ports" placeholder="Port" name="backend_server_ports" oninput="validateIP(event)">
                                                 </div>
                                                 <div class="col-1" id="weight_field" style="display: none;">
                                                     <label for="exampleInputName4">Weight</label>
-                                                    <input type="number" class="form-control" id="backend_server_weights" placeholder="Weight" name="backend_server_weights" value="1">
+                                                    <input type="text" class="form-control" id="backend_server_weights" placeholder="Weight" name="backend_server_weights" value="1" oninput="validateIP(event)">
                                                 </div>                                            
                                             </div>
                                         </div>
@@ -126,7 +127,58 @@
             </div>
         </div>
     </body>
+    <!-- <script>
+        function save_reload_create() {
+            const apiUrl = "http://" + window.location.host + "/add";
+
+            const postData = {
+                action: 'add',
+            };
+
+            const requestOptions = {
+                method: 'POST',
+                headers: {
+                'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(postData)
+            };
+
+            fetch(apiUrl, requestOptions)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Response:', data);
+                    if (data.success) {
+                        alert(data.message); // Menampilkan pesan sukses
+                        window.location.href = "http://" + window.location.host
+                    } else {
+                        alert(data.message); // Menampilkan pesan kesalahan
+                        window.location.href = "http://" + window.location.host + "/add"
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert("Data gagal tersimpan.");
+                    window.location.href = "http://" + window.location.host + "/add"
+                });
+        }
+    </script> -->
     <script>
+        function validateIP(event) {
+            const input = event.target.value;
+            // Regex untuk memeriksa apakah input hanya terdiri dari angka dan titik
+            const regex = /^[0-9.]*$/;
+
+            // Jika input tidak sesuai dengan regex, hapus karakter terakhir
+            if (!regex.test(input)) {
+                event.target.value = input.slice(0, -1);
+            }
+        }
+
         function protocolFunction() {
             let protocol = document.getElementById("protocol").value;
             let frontendPortGroup = document.getElementById("frontend_port_group");
@@ -143,7 +195,7 @@
 
         // Function to toggle SSL fields
         document.addEventListener('DOMContentLoaded', function () {
-            document.getElementById('ssl_checkbox').addEventListener('change', function () {
+            document.getElementById('use_ssl').addEventListener('change', function () {
                 document.getElementById('ssl_fields').style.display = this.checked ? 'block' : 'none';
             });
         });
@@ -230,6 +282,7 @@
             y.setAttribute("id", "exampleInputName" + backendCounter);
             y.setAttribute("placeholder", "IP Address");
             y.setAttribute("name", "backend_server_ips");
+            y.setAttribute("oninput", "validateIP(event)");
             y.className = "form-control";
 
             // Membuat elemen div untuk kolom IP backend server
@@ -243,10 +296,11 @@
             labelPort.setAttribute("for", "exampleInputName" + backendCounter);
             labelPort.textContent = "Port";
             var z = document.createElement("INPUT");
-            z.setAttribute("type", "number");
+            z.setAttribute("type", "text");
             z.setAttribute("id", "exampleInputName" + backendCounter);
             z.setAttribute("placeholder", "Port");
             z.setAttribute("name", "backend_server_ports");
+            z.setAttribute("oninput", "validateIP(event)");
             z.className = "form-control";
 
             // Membuat elemen div untuk kolom port backend server
@@ -269,10 +323,11 @@
                 labelWeight.setAttribute("for", "exampleInputName" + backendCounter);
                 labelWeight.textContent = "Weight";
                 var w = document.createElement("INPUT");
-                w.setAttribute("type", "number");
+                w.setAttribute("type", "text");
                 w.setAttribute("id", "exampleInputName" + backendCounter);
                 w.setAttribute("placeholder", "Weight");
                 w.setAttribute("name", "backend_server_weights");
+                w.setAttribute("oninput", "validateIP(event)");
                 w.className = "form-control";
 
                 var colWeight = document.createElement("div");
@@ -305,7 +360,7 @@
         document.addEventListener('DOMContentLoaded', function () {
             lbMethodFunction();
         });
-    </script>    
+    </script> 
         <!-- plugins:js -->
         <script src="{{url_for('static', filename='vendors/js/vendor.bundle.base.js')}}"></script>
         <!-- endinject -->

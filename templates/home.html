@@ -42,7 +42,13 @@
                     </div>
 
                     <a class="btn btn-primary me-2 mb-xl-4" href="{{ url_for('add') }}">Add HAProxy</a>
-                    
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }}">{{ message }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
                     <div class="row">
                         <div class="col-md-12 grid-margin stretch-card">
                             <div class="card">
@@ -50,63 +56,82 @@
                                     <p class="card-title">HAProxy Table</p>
                                     <div class="row">
                                         <div class="col-12">
-                                            <div class="table-responsive">
-                                                <table id="example" class="display expandable-table" style="width:100%">
-                                                    <thead>
-                                                      <tr>
-                                                        <th>No.</th>
-                                                        <th>Name</th>
-                                                        <th>Mode</th>
-                                                        <th>Port</th>
-                                                        <th>Algoritma</th>
-                                                        <th>SSL</th>
-                                                        <th>Status</th>
-                                                        <th>URL</th>
-                                                        <th>Action</th>
-                                                      </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                      {% for haproxy in haproxy_data %}
-                                                        <tr>
-                                                            <td>{{ loop.index }}</td>
-                                                            <td>{{ haproxy.haproxy_name }}</td>
-                                                            <td>{{ haproxy.modes | join(', ') }}</td>
-                                                            <td>{{ haproxy.frontend_port }}</td>
-                                                            <td>
-                                                                {% if haproxy.lb_method == 'roundrobin' %}
-                                                                    Round Robin
-                                                                {% elif haproxy.lb_method == 'source' %}
-                                                                    IP Hash
-                                                                {% elif haproxy.lb_method == 'leastconn' %}
-                                                                    Least Connection
-                                                                {% else %}
-                                                                    {{ haproxy.lb_method }}
-                                                                {% endif %}
-                                                            </td>
-                                                            <td>
+                                            <table id="example" class="display expandable-table" style="width:100%">
+                                                <thead>
+                                                    <tr>
+                                                    <th>No.</th>
+                                                    <th>Name</th>
+                                                    <th>Mode</th>
+                                                    <th>Port</th>
+                                                    <th>Algoritma</th>
+                                                    <th>SSL</th>
+                                                    <th>Server name</th>
+                                                    <th>URL</th>
+                                                    <th>Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for haproxy in haproxy_data %}
+                                                    <tr>
+                                                        <td>{{ loop.index }}</td>
+                                                        <td>{{ haproxy.haproxy_name }}</td>
+                                                        <td>{{ haproxy.modes | join(', ') }}</td>
+                                                        <td>{{ haproxy.frontend_port }}</td>
+                                                        <td>
+                                                            {% if haproxy.lb_method == 'roundrobin' %}
+                                                                Round Robin
+                                                            {% elif haproxy.lb_method == 'source' %}
+                                                                IP Hash
+                                                            {% elif haproxy.lb_method == 'leastconn' %}
+                                                                Least Connection
+                                                            {% else %}
+                                                                {{ haproxy.lb_method }}
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% if haproxy.domain_name %}
+                                                                Manual
+                                                            {% else %}
+                                                                None
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% for backend in haproxy.backends %}
+                                                                <div class="d-flex justify-content-between align-items-center mb-1"> 
+                                                                    {% if backend.status == 'Active' %}
+                                                                        <span class="badge bg-success">{{ backend.ip }}</span>
+                                                                    {% else %}
+                                                                        <span class="badge bg-danger">{{ backend.ip }}</span>
+                                                                    {% endif %}
+                                                                </div>
+                                                            {% endfor %}
+                                                        </td>
+                                                        <td>
+                                                            <a target="_blank" class="text-black" href="{% if haproxy.domain_name %}https://{{ haproxy.domain_name }}{% if 'tcp' in haproxy.modes %}:{{ haproxy.frontend_port }}{% endif %}{% else %}http://{{ request.host.split(':')[0] }}{% if 'tcp' in haproxy.modes %}:{{ haproxy.frontend_port }}{% endif %}{% endif %}">
                                                                 {% if haproxy.domain_name %}
-                                                                    Manual
+                                                                    https://{{ haproxy.domain_name }}{% if 'tcp' in haproxy.modes %}:{{ haproxy.frontend_port }}{% endif %}
                                                                 {% else %}
-                                                                    None
+                                                                    http://{{ request.host.split(':')[0] }}{% if 'tcp' in haproxy.modes %}:{{ haproxy.frontend_port }}{% endif %}
                                                                 {% endif %}
-                                                            </td>
-                                                            <td>Active</td>
-                                                            <td>
-                                                                <a target="_blank" href="{% if haproxy.domain_name %}https://{{ haproxy.domain_name }}:{{ haproxy.frontend_port }}{% else %}http://{{ request.host.split(':')[0] }}:{{ haproxy.frontend_port }}{% endif %}">
-                                                                    {% if haproxy.domain_name %}https://{{ haproxy.domain_name }}:{{ haproxy.frontend_port }}{% else %}http://{{ request.host.split(':')[0] }}:{{ haproxy.frontend_port }}{% endif %}
-                                                                </a>
-                                                            </td>
-                                                            <td>
-                                                                <a class="btn btn-warning btn-sm" href="{{ url_for('edit', haproxy_name=haproxy.haproxy_name) }}" name="save_reload_update">Edit</a> |
-                                                                <form action="{{ url_for('delete', haproxy_name=haproxy.haproxy_name, file_name=haproxy.haproxy_name) }}" method="post" style="display: inline;">
-                                                                    <button type="submit" class="btn btn-danger btn-sm" name="save_reload_delete" onclick="return confirm('Are you sure you want to delete this configuration?');">Delete</button>
-                                                                </form>
-                                                            </td>
-                                                        </tr>
-                                                      {% endfor %}
-                                                    </tbody>
-                                                </table>
-                                            </div>
+                                                            </a>
+                                                        </td>
+                                                        <td>
+                                                            <div class="dropdown">
+                                                                <button type="button" class="btn" id="dropdownMenuIconButton3" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                                                    <i class="mdi mdi-dots-vertical"></i>
+                                                                </button>
+                                                                <div class="dropdown-menu" aria-labelledby="dropdownMenuIconButton3">
+                                                                    <a class="dropdown-item" href="{{ url_for('edit', haproxy_name=haproxy.haproxy_name) }}" name="save_reload_update">Edit</a>
+                                                                    <form action="{{ url_for('delete', haproxy_name=haproxy.haproxy_name, file_name=haproxy.haproxy_name) }}" method="post" style="display: inline;">
+                                                                        <button type="submit" class="dropdown-item" name="save_reload_delete" onclick="return confirm('Are you sure you want to delete this configuration?');">Delete</button>
+                                                                    </form>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
                                         </div>
                                     </div>
                                 </div>

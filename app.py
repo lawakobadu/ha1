@@ -1,8 +1,9 @@
 from flask import Flask, jsonify, render_template, Response, request, url_for, session, redirect, flash, make_response
 from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
-import subprocess, re, os, jwt, datetime, json
+import subprocess, re, os, jwt, datetime, json, csv, requests
 from functools import wraps
+from requests.exceptions import ConnectionError
 
 
 app = Flask(__name__)
@@ -64,20 +65,20 @@ def read_from_file(haproxy_names):
         content = f.read().strip()
 
         # Gabungan regex frontend dengan dan tanpa SSL
-        pattern_frontend = re.compile(
-            r'frontend\s+(\S+)\s+.*?bind\s+(\S+):(\d+).*?(?:\n\s+#\s+domain_name\s+(\S+))?\s*\n\s+mode\s+(\S+).*?\n\s+default_backend\s+(\S+)', 
-            re.DOTALL
-        )
+        pattern_frontend = re.compile(r'frontend\s+(\S+)\s+.*?bind\s+(\S+):(\d+).*?(?:\n\s+#\s+domain_name\s+(\S+))?\s*\n\s+mode\s+(\S+)', re.DOTALL)
         frontend_matches = pattern_frontend.findall(content)
         print("frontend_matches : ", frontend_matches)
 
         # Pola regex untuk backend
         pattern_backend = re.compile(r'backend\s+(\S+)\s+balance\s+(\S+)(.*?)(?=\nfrontend|\Z)', re.DOTALL)
         backend_matches = pattern_backend.findall(content)
+        print("backend_matches : ", backend_matches)
 
         # Pola regex untuk server dengan dan tanpa weight
         pattern_backend_servers_weight = re.compile(r'server\s+(\w+)\s+([\d.]+:\d+)\s+weight\s+(\d+)\s+check')
         pattern_backend_servers_no_weight = re.compile(r'server\s+(\w+)\s+([\d.]+:\d+)\s+check')
+        print("pattern_backend_servers_weight : ", pattern_backend_servers_weight)
+        print("pattern_backend_servers_no_weight : ", pattern_backend_servers_no_weight)
 
         for match in frontend_matches:
             haproxy_name = match[0].strip()
@@ -85,11 +86,11 @@ def read_from_file(haproxy_names):
                 frontend_port = match[2].strip()
                 domain_name = match[3].strip()  # Default IP jika domain_name tidak ada
                 protocol = match[4].strip()
-                backend_name = match[5].strip()
+                # backend_name = match[5].strip()
 
                 # Cari backend yang sesuai dengan default_backend dari frontend
                 backend_data = next(
-                    (b for b in backend_matches if b[0] == backend_name), None
+                    (b for b in backend_matches if b[0] == haproxy_name), None
                 )
 
                 if backend_data:
@@ -138,9 +139,9 @@ def save_to_file(data):
     frontend_port = data.get('frontend_port')
     protocol = data.get('protocol')
     lb_method = data.get('lb_method')
-    backend_servers = data.get('backend_servers', [])
     use_ssl = data.get('use_ssl', '')
     ssl_cert_path = data.get('ssl_cert_path', '')
+    backend_servers = data.get('backend_servers', [])
     domain_name = data.get('domain_name', '')
 
     # Read current configuration to check for existing frontends and ports
@@ -149,9 +150,11 @@ def save_to_file(data):
 
     # Check port if already used
     if protocol == 'tcp' and f"bind *:{frontend_port}" in existing_config:
-        return {'success': False, 'message': f"Port {frontend_port} is already in use."}
-    elif protocol == 'http' and 'bind *:80' in existing_config and 'bind *:443' in existing_config:
-        return {'success': False, 'message': "Port 80 or 443 is already in use."}
+        # return {'success': False, 'message': f"Port {frontend_port} is already in use."}
+        return flash(f"Port {frontend_port} it's already use", "danger")
+    if protocol == 'http' and not use_ssl and "bind *:80" in existing_config:
+        # return {'success': False, 'message': "Port 80 or 443 is already in use."}
+        return flash("Port 80 it's already use. Please! use domain if you want using protocol http", "danger")
     
     # Write SSL certificate to file if provided
     if use_ssl and ssl_cert_path:
@@ -182,16 +185,20 @@ def save_to_file(data):
             else:
                 haproxy_cfg.write(f"        bind *:{frontend_port}\n")
             haproxy_cfg.write(f"        mode tcp\n")
+            haproxy_cfg.write(f"        default_backend {haproxy_name}\n")
         elif protocol == 'http':
             if use_ssl:
                 haproxy_cfg.write(f"        bind *:443 ssl crt /etc/haproxy-dashboard/ssl/{haproxy_name}.pem\n")
                 haproxy_cfg.write(f"        redirect scheme https code 301 if !{{ ssl_fc }}\n")
                 haproxy_cfg.write(f"        # domain_name {domain_name}\n")
+                haproxy_cfg.write(f"        mode http\n")
+                haproxy_cfg.write(f"        # default_backend {haproxy_name}\n")
+                haproxy_cfg.write(f"        acl is_{haproxy_name}_acl hdr(host) -i {domain_name}\n")
+                haproxy_cfg.write(f"        use_backend {haproxy_name} if is_{haproxy_name}_acl\n")
             else:
                 haproxy_cfg.write(f"        bind *:80\n")
-            haproxy_cfg.write(f"        mode http\n")
-
-        haproxy_cfg.write(f"        default_backend {haproxy_name}\n")
+                haproxy_cfg.write(f"        mode http\n")
+                haproxy_cfg.write(f"        default_backend {haproxy_name}\n")
 
         # Backend configuration
         haproxy_cfg.write(f"\nbackend {haproxy_name}\n")
@@ -208,7 +215,8 @@ def save_to_file(data):
                 backend_server_name, backend_server_ip, backend_server_port = backend_server_info
                 if backend_server_name and backend_server_ip and backend_server_port:
                     haproxy_cfg.write(f"        server {backend_server_name} {backend_server_ip}:{backend_server_port} check\n")
-
+    
+    # return flash("Frontend and Backend added successfully.", "success")
     return {'success': True, 'message': "Frontend and Backend added successfully."}
 
 
@@ -232,24 +240,20 @@ def delete_conf(haproxy_name):
             inside_frontend = True
             continue  # Skip this line (delete it)
         
-        if inside_frontend and stripped_line.startswith("default_backend"):
-            backend_name = stripped_line.split(" ")[1]  # Capture the backend name to delete
+        if inside_frontend:
+            if not stripped_line:
+                inside_frontend = False
+            continue
 
-        if inside_frontend and not stripped_line:
-            # End of frontend block
-            inside_frontend = False
+        if inside_backend:
+            if not stripped_line:
+                inside_backend = False  # End of backend block
             continue
         
         # Handle backend section
-        if backend_name and stripped_line.startswith(f"backend {backend_name}"):
+        if stripped_line.startswith(f"backend {haproxy_name}"):
             inside_backend = True
             continue  # Skip this line (delete it)
-        
-        if inside_backend and not stripped_line:
-            # End of backend block
-            inside_backend = False
-            backend_name = None  # Reset backend name after processing
-            continue
         
         # Count remaining HAProxy frontends
         if stripped_line.startswith("frontend"):
@@ -286,6 +290,7 @@ def delete_conf(haproxy_name):
     with open(CONFIG_FILE_PATH, 'w') as haproxy_cfg:
         haproxy_cfg.writelines(new_lines)
 
+    # return flash(f"Frontend '{haproxy_name}' and its associated backend have been deleted.", "success")
     return {'success': True, 'message': f"Frontend '{haproxy_name}' and its associated backend have been deleted."}
 
 
@@ -416,24 +421,138 @@ def index():
     return render_template('index.html')
 
 
+def haproxy_stats():
+    # Mengambil data CSV dari URL
+    csv_url = f"http://{request.host.split(':')[0]}:9999/stats;csv"
+    
+    try:
+        response = requests.get(csv_url)
+        response.raise_for_status()  # Untuk menangani HTTP error yang lain
+        decoded_content = response.content.decode('utf-8')
+
+        # Mem-parsing CSV
+        csv_reader = csv.reader(decoded_content.splitlines(), delimiter=',')
+        data = list(csv_reader)
+
+        # Memproses data CSV untuk frontend dan backend
+        processed_data = []
+        backend_names = set()  # Set untuk menyimpan nama backend yang unik
+
+        for index, row in enumerate(data):
+            # Memastikan row tidak kosong dan memiliki kolom yang cukup
+            if len(row) > 50:
+                # Memastikan ini bukan baris header
+                if index == 0:  # Jika ini adalah baris pertama (header), lewati
+                    continue
+                if row[0] == 'stats' and row[1] in ['FRONTEND', 'BACKEND']:
+                    continue
+
+                # Menangkap baris FRONTEND
+                if row[1] == 'FRONTEND':
+                    processed_data.append({
+                        'pxname': row[0],
+                        'svname': row[1],
+                        'status': row[17],
+                    })
+                # Menangkap baris BACKEND dan nama backend lainnya
+                elif row[1] == 'BACKEND' or row[1] not in ['FRONTEND']:
+                    processed_data.append({
+                        'pxname': row[0],
+                        'svname': row[1],
+                        'status': row[17],
+                    })
+                    backend_names.add(row[0])  # Menyimpan nama backend unik
+
+        return processed_data, backend_names
+
+    except ConnectionError:
+        # Jika terjadi error koneksi, kembalikan data kosong dan backend_names kosong
+        return [], set()
+
 @app.route("/home", methods=['GET', 'POST'])
 def home():
     if not session.get('logged_in'):
         return '<script>alert("Harus login dulu"); window.location.href = "/";</script>'
-    
+
     file_name = request.args.get('file_name')
-    
+
     haproxy_data, layer7_count, layer4_count = haproxy_info()
     haproxy_exists = is_haproxy_exist()
+    haproxy_stats_data, backend_names = haproxy_stats()
+
+    # Baca konfigurasi HAProxy dari file
+    with open(CONFIG_FILE_PATH, 'r') as f:
+        content = f.read().strip()
+
+        # Gabungan regex untuk frontend dan backend
+        pattern = re.compile(
+            r'frontend\s+(\S+)\s+.*?bind\s+(\S+):(\d+).*?(?:\n\s+#\s+domain_name\s+(\S+))?\s*\n\s+mode\s+(\S+).*?'
+            r'backend\s+(\S+)\s+balance\s+(\S+)(.*?)\s*(?=frontend|\Z)', 
+            re.DOTALL
+        )
+        
+        matches = pattern.findall(content)
+
+        # Menyimpan data haproxy
+        for match in matches:
+            frontend_name = match[0].strip()
+            frontend_port = match[2].strip()
+            domain_name = match[3].strip() if match[3] else None
+            protocol = match[4].strip()
+            backend_name = match[5].strip()
+            lb_method = match[6].strip()
+            backend_servers_block = match[7].strip()
+
+            # Pola regex untuk server backend
+            pattern_backend_servers = re.compile(
+                r'server\s+(\w+)\s+([\d.:]+)(?:\s+weight\s+(\d+))?\s+check'
+            )
+            
+            backend_servers = []
+            server_matches = pattern_backend_servers.findall(backend_servers_block)
+            
+            for server in server_matches:
+                backend_servers.append({
+                    'name': server[0].strip(),
+                    'ip': server[1].split(':')[0].strip(),
+                    'port': server[1].split(':')[1].strip() if ':' in server[1] else None,
+                    'weight': server[2].strip() if len(server) > 2 else None
+                })
+
+            # Tambahkan backend servers ke data haproxy
+            for haproxy in haproxy_data:
+                if haproxy['haproxy_name'] == frontend_name:
+                    haproxy['backend_servers'] = backend_servers
+
+    # Proses status backend untuk tiap haproxy
+    for haproxy in haproxy_data:
+        haproxy['backends'] = []  # List untuk menyimpan status tiap backend
+
+        # Cek status tiap backend
+        for stat in haproxy_stats_data:
+            if stat['pxname'] == haproxy['haproxy_name'] and stat['svname'] != 'FRONTEND':
+                if stat['svname'] != 'BACKEND':
+                    backend_status = {
+                        'name': stat['svname'],
+                        'status': 'Active' if stat['status'] in ['UP', 'OPEN'] else 'Error',
+                        'ip': None  # Placeholder untuk IP
+                    }
+                    # Temukan IP dari backend servers
+                    for server in haproxy.get('backend_servers', []):
+                        if backend_status['name'] == server['name']:
+                            backend_status['ip'] = server['ip']  # Assign IP yang benar
+                    haproxy['backends'].append(backend_status)
 
     return render_template(
-        'home.html', 
-        haproxy_data=haproxy_data, 
-        haproxy_exists=haproxy_exists, 
+        'home.html',
+        haproxy_data=haproxy_data,
+        haproxy_exists=haproxy_exists,
         layer7_count=layer7_count,
         layer4_count=layer4_count,
-        file_name=file_name
+        file_name=file_name,
+        haproxy_stats=haproxy_stats_data
     )
+
 
 
 @app.route('/logout')
@@ -455,7 +574,7 @@ def add():
             'frontend_port': request.form['frontend_port'],
             'lb_method': lb_method,
             'protocol': request.form['protocol'],
-            'use_ssl': 'ssl_checkbox' in request.form,
+            'use_ssl': 'use_ssl' in request.form and request.form['use_ssl'] == 'on',
             'ssl_cert_path': request.form.get('ssl_cert_path', ''),
             'domain_name': request.form.get('domain_name', '')
         }
@@ -490,7 +609,7 @@ def add():
                 check_output += f"\n\nError occurred:\n{error_message}"
             else:
                 # If no error, run haproxy -D -f to reload HAProxy
-                reload_result = subprocess.run(['systemctl', 'restart', 'haproxy', CONFIG_FILE_PATH], capture_output=True, text=True)
+                reload_result = subprocess.run(['systemctl', 'reload', 'haproxy', CONFIG_FILE_PATH], capture_output=True, text=True)
                 check_output += f"\n\nHAProxy Restart Output:\n{reload_result.stdout}"
 
         return redirect(url_for('home'))
@@ -519,7 +638,7 @@ def edit(haproxy_name):
                 'haproxy_name': request.form['haproxy_name'],
                 'frontend_port': request.form['frontend_port'],
                 'protocol': request.form['protocol'],
-                'use_ssl': 'ssl_checkbox' in request.form,
+                'use_ssl': 'use_ssl' in request.form,
                 'ssl_cert_path': ssl_cert_content,
                 'domain_name': request.form['domain_name'],
                 'lb_method': request.form['lb_method']
@@ -555,7 +674,7 @@ def edit(haproxy_name):
                     check_output += f"\n\nError occurred:\n{error_message}"
                 else:
                     # Reload HAProxy if validation succeeds
-                    reload_result = subprocess.run(['systemctl', 'restart', 'haproxy'], capture_output=True, text=True)
+                    reload_result = subprocess.run(['systemctl', 'reload', 'haproxy'], capture_output=True, text=True)
                     check_output += f"\n\nHAProxy Restart Output:\n{reload_result.stdout}"
 
             return redirect(url_for('home'))
@@ -579,10 +698,10 @@ def delete(haproxy_name, file_name):
     if os.path.exists(key_file):
         os.remove(key_file)
     else:
-        flash(f'PEM file "{file_name}.pem" not found!', 'error')
+        None
     
     if not os.path.exists(key_file):
-        flash(f'Files "{file_name}.pem" successfully deleted!', 'success')
+        None
 
     # Check if the save_reload_delete button was pressed
     if 'save_reload_delete' in request.form:
@@ -593,14 +712,12 @@ def delete(haproxy_name, file_name):
         if check_result.returncode != 0:
             error_message = check_result.stderr
             check_output += f"\n\nError occurred:\n{error_message}"
-            flash('Configuration validation failed. See details below.', 'error')
             return redirect(url_for('home'))
 
         # Restart HAProxy if validation succeeds
-        reload_result = subprocess.run(['systemctl', 'restart', 'haproxy'], capture_output=True, text=True)
+        reload_result = subprocess.run(['systemctl', 'reload', 'haproxy'], capture_output=True, text=True)
         check_output += f"\n\nHAProxy Restart Output:\n{reload_result.stdout}"
 
-        flash('Configuration deleted and HAProxy has been restarted!', 'success')
         return redirect(url_for('home'))
 
     return render_template('home.html')
