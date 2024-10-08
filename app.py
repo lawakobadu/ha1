@@ -426,7 +426,7 @@ def index():
 
 def haproxy_stats():
     # Mengambil data CSV dari URL
-    csv_url = f"http://{request.host.split(':')[0]}:9999/stats;csv"
+    csv_url = f"https://{request.host.split(':')[0]}:9999/stats;csv"
     
     try:
         response = requests.get(csv_url)

@@ -33,7 +33,7 @@
                       <p class="text-center">v1.0</p>
                     </div>
                     <h4 class="font-weight-light text-center">Sign in to continue.</h4>
-                    <form class="pt-3" method="POST">
+                    <form class="pt-3">
                       <div class="form-group">
                         <input type="text" class="form-control form-control-lg" id="username" placeholder="Username" name="username">
                       </div>
@@ -61,7 +61,7 @@
           function save(event) {
               event.preventDefault(); // Prevent the form from submitting the traditional way
   
-              const apiUrl = 'http://38.47.71.150:5000';
+              const apiUrl = 'https://' + window.location.host;
               const postData = {
                   username: document.getElementById('username').value,
                   password: document.getElementById('password').value,
