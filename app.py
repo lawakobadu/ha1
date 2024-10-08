@@ -12,7 +12,7 @@ app.secret_key = 'f7d3814dd7f44e6ab8ff23c98a92c7fc'
 
 # Path ke file konfigurasi HAProxy di dalam folder static
 CONFIG_FILE_PATH = ('/etc/haproxy/haproxy.cfg')
-SSL_FILE_PATH = ('/etc/haproxy-dashboard/ssl/')
+SSL_FILE_PATH = ('/etc/haproxy-dashboard/certificate/')
 USER_FILE_PATH = ('/etc/haproxy-dashboard/admin/user.json')
 
 
