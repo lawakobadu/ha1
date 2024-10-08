@@ -58,7 +58,8 @@ Sebelum memulai, pastikan Anda memiliki hal-hal berikut:
    
    ```bash
    https://your-haproxy-server-ip:5000
-
+   ```
+   
    Username : admin
    Password : admin123
    Password sudah terenkripsi, silahkan lakukan reset password
