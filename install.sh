@@ -7,13 +7,14 @@ sudo mkdir -p /etc/haproxy-dashboard
 
 sudo cp -r __pycache__/ /etc/haproxy-dashboard/
 sudo cp -r .venv/ /etc/haproxy-dashboard/
+sudo cp -r admin/ /etc/haproxy-dashboard/
+sudo cp -r ssl/ /etc/haproxy-dashboard/
 sudo cp -r static/ /etc/haproxy-dashboard/
 sudo cp -r templates/ /etc/haproxy-dashboard/
 sudo cp app.py /etc/haproxy-dashboard/
 sudo cp Makefile /etc/haproxy-dashboard/
 sudo cp requirements.txt /etc/haproxy-dashboard/
 sudo cp ssl.ini /etc/haproxy-dashboard/
-sudo cp -r ssl/ /etc/haproxy-dashboard/
 
 
 # Create the service file for 'haproxy-dashboard'
