@@ -66,7 +66,9 @@
                                             <div class="form-group">
                                                 <div class="form-check">
                                                     <label class="form-check-label">
-                                                    <i class="mdi mdi-lock"></i><input type="checkbox" class="form-check-input" id="use_ssl" name="use_ssl" onchange="toggleSSLFields()"> Use SSL Certificate </label>
+                                                        <i class="mdi mdi-lock"></i>
+                                                        <input type="checkbox" class="form-check-input" id="use_ssl" name="use_ssl" onchange="toggleSSLFields()"> Use SSL Certificate
+                                                    </label>
                                                 </div>
                                             </div>
                                             <div class="ssl_fields" id="ssl_fields" style="display: none;">
@@ -106,7 +108,7 @@
                                             <div class="form-group row g-3 align-items-end">
                                                 <div class="col">
                                                     <label for="exampleInputName1">Server 1 Name</label>
-                                                    <input type="text" class="form-control" id="backend_server_names" placeholder="Server 1 Name" name="backend_server_names" value="{{ request.form['backend_server_names'] }}" required>
+                                                    <input type="text" class="form-control" id="backend_server_names" placeholder="Server 1 Name" name="backend_server_names" pattern="[A-Za-z0-9]+" title="Only letters and numbers are allowed" value="{{ request.form['backend_server_names'] }}" required>
                                                 </div>
                                                 <div class="col">
                                                     <label for="exampleInputName2">IP Address</label>

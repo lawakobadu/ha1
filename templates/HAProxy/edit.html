@@ -109,7 +109,7 @@
                                                     </div>
                                                     <div class="col">
                                                         <label for="exampleInputName1">Server {{ counts }} Name</label>
-                                                        <input type="text" class="form-control" id="exampleInputName1" placeholder="Server {{ counts }} Name" name="backend_server_names" value="{{ server['name'] }}" required>
+                                                        <input type="text" class="form-control" id="exampleInputName1" placeholder="Server {{ counts }} Name" name="backend_server_names" pattern="[A-Za-z0-9]+" title="Only letters and numbers are allowed" value="{{ server['name'] }}" required>
                                                     </div>
                                                     <div class="col">
                                                         <label for="exampleInputName2">IP Address</label>

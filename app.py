@@ -7,10 +7,12 @@ from requests.exceptions import ConnectionError
 from OpenSSL import SSL
 import configparser
 import ssl
+from datetime import timedelta
 
 
 app = Flask(__name__)
 app.secret_key = 'f7d3814dd7f44e6ab8ff23c98a92c7fc'
+# app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(seconds=300)
 
 
 # Path ke file konfigurasi HAProxy di dalam folder static
@@ -87,7 +89,7 @@ def read_from_file(haproxy_names):
             haproxy_name = match[0].strip()
             if haproxy_name == haproxy_names:
                 frontend_port = match[2].strip()
-                domain_name = match[3].strip()  # Default IP jika domain_name tidak ada
+                domain_name = match[3].strip()
                 protocol = match[4].strip()
                 # backend_name = match[5].strip()
 
@@ -104,7 +106,7 @@ def read_from_file(haproxy_names):
                     backend_servers = []
                     
                     if lb_method == 'roundrobin':
-                        # Jika roundrobin, server-server dengan weight
+                        # Jika roundrobin, ambil server dengan weight
                         server_matches = pattern_backend_servers_weight.findall(backend_servers_block)
                         for server in server_matches:
                             backend_servers.append({
@@ -147,16 +149,16 @@ def save_to_file(data):
     backend_servers = data.get('backend_servers', [])
     domain_name = data.get('domain_name', '')
 
-    # Read current configuration to check for existing frontends and ports
+    # Read configuration file
     with open(CONFIG_FILE_PATH, 'r') as haproxy_cfg_read:
         existing_config = haproxy_cfg_read.read()
     
-    # Write SSL certificate to file if provided
+    # Buat ssl file jika tersedia
     if use_ssl and ssl_cert_path:
         cert_file_name = f"{haproxy_name}.pem"
         certificate(cert_file_name, ssl_cert_path)
 
-    # Write HAProxy configuration
+    # Tulis HAProxy konfigurasi
     with open(CONFIG_FILE_PATH, 'a') as haproxy_cfg:
         # Stats configuration
         if 'listen stats' not in existing_config:
@@ -224,7 +226,7 @@ def delete_conf(haproxy_name):
     inside_backend = False
     inside_listen_stats = False
     backend_name = None
-    haproxy_count = 0  # Counter to check remaining HAProxy frontends
+    haproxy_count = 0
 
     # First pass: Remove frontend and backend sections related to haproxy_name
     for line in lines:
@@ -252,7 +254,7 @@ def delete_conf(haproxy_name):
         
         # Count remaining HAProxy frontends
         if stripped_line.startswith("frontend"):
-            haproxy_count += 1  # Count all remaining frontends except the one being deleted
+            haproxy_count += 1 # Menghitung semua jumlah frontend kecuali kalau tinggal 1 frontend, akan menghapus semua file
 
         # Add non-empty lines and lines outside of the deleted sections
         if not inside_frontend and not inside_backend:
@@ -383,7 +385,7 @@ def haproxy_info():
 @app.route("/", methods=["GET", "POST"])
 def index():
     if session.get('logged_in'):
-        return '<script>alert("Akses dilarang"); window.location.href = "/home";</script>'
+        return '<script>alert("Forbidden access"); window.location.href = "/home";</script>'
 
     is_user = is_user_exist()
 
@@ -398,6 +400,7 @@ def index():
 
         # if username in is_user and is_user[username]['password'] == password:
         if username in is_user and check_password_hash(is_user[username]['password'], password):
+            # session.permanent = True
             session['logged_in'] = True
             session['username'] = username
             token = jwt.encode({
@@ -467,7 +470,7 @@ def haproxy_stats():
 @app.route("/home", methods=['GET', 'POST'])
 def home():
     if not session.get('logged_in'):
-        return '<script>alert("Harus login dulu"); window.location.href = "/";</script>'
+        return '<script>alert("You must login or session time has been expired"); window.location.href = "/";</script>'
 
     file_name = request.args.get('file_name')
 
@@ -549,7 +552,6 @@ def home():
     )
 
 
-
 @app.route('/logout')
 def logout():
     session.clear()
@@ -559,7 +561,7 @@ def logout():
 @app.route("/add", methods=['GET', 'POST'])
 def add():
     if not session.get('logged_in'):
-        return '<script>alert("Harus login dulu"); window.location.href = "/";</script>'
+        return '<script>alert("You must login or session time has been expired"); window.location.href = "/";</script>'
 
     if request.method == 'POST':
         # Ambil data dari form
@@ -576,6 +578,13 @@ def add():
         if not backend_server_names or any(name == '' for name in backend_server_names):
             flash("All backend server names are required", "danger")
             return render_template('HAProxy/add.html')
+        
+        # Validasi agar hanya abjad dan angka yang diterima
+        alphanumeric_pattern = re.compile(r'^[A-Za-z0-9]+$')
+        for name in backend_server_names:
+            if not alphanumeric_pattern.match(name):
+                flash(f"Backend server name '{name}' is invalid. Only letters and numbers are allowed.", "danger")
+                return render_template('HAProxy/add.html')
 
         if not backend_server_ips or any(ip == '' for ip in backend_server_ips):
             flash("All backend server IPs are required", "danger")
@@ -584,6 +593,20 @@ def add():
         if not backend_server_ports or any(port == '' for port in backend_server_ports):
             flash("All backend server ports are required", "danger")
             return render_template('HAProxy/add.html')
+        
+        # Cek jika SSL diaktifkan
+        use_ssl = 'use_ssl' in request.form and request.form['use_ssl'] == 'on'
+        if use_ssl:
+            ssl_cert_path = request.form.get('ssl_cert_path', '')
+            domain_name = request.form.get('domain_name', '')
+
+            if not ssl_cert_path:
+                flash("SSL Certificate path is required when SSL is enabled", "danger")
+                return render_template('HAProxy/add.html')
+
+            if not domain_name:
+                flash("Domain Name is required when SSL is enabled", "danger")
+                return render_template('HAProxy/add.html')
 
         # Siapkan data setelah validasi
         lb_method = request.form['lb_method']
@@ -593,9 +616,9 @@ def add():
             'frontend_port': request.form['frontend_port'],
             'lb_method': lb_method,
             'protocol': request.form['protocol'],
-            'use_ssl': 'use_ssl' in request.form and request.form['use_ssl'] == 'on',
-            'ssl_cert_path': request.form.get('ssl_cert_path', ''),
-            'domain_name': request.form.get('domain_name', '')
+            'use_ssl': use_ssl,
+            'ssl_cert_path': ssl_cert_path if use_ssl else '',
+            'domain_name': domain_name if use_ssl else ''
         }
 
         if lb_method == 'roundrobin':
@@ -657,7 +680,7 @@ def add():
 @app.route("/edit/<haproxy_name>", methods=['GET', 'POST'])
 def edit(haproxy_name):
     if not session.get('logged_in'):
-        return '<script>alert("Harus login dulu"); window.location.href = "/";</script>'
+        return '<script>alert("You must login or session time has been expired"); window.location.href = "/";</script>'
     
     ssl_cert_content = ''
 
@@ -680,6 +703,13 @@ def edit(haproxy_name):
             if not backend_server_names or any(name == '' for name in backend_server_names):
                 flash("All backend server names are required", "danger")
                 return render_template('HAProxy/edit.html', **item, ssl_cert_path=ssl_cert_content)
+            
+            # Validasi agar hanya abjad dan angka yang diterima
+            alphanumeric_pattern = re.compile(r'^[A-Za-z0-9]+$')
+            for name in backend_server_names:
+                if not alphanumeric_pattern.match(name):
+                    flash(f"Backend server name '{name}' is invalid. Only letters and numbers are allowed.", "danger")
+                    return render_template('HAProxy/edit.html', **item, ssl_cert_path=ssl_cert_content)
 
             if not backend_server_ips or any(ip == '' for ip in backend_server_ips):
                 flash("All backend server IPs are required", "danger")
@@ -688,8 +718,10 @@ def edit(haproxy_name):
             if not backend_server_ports or any(port == '' for port in backend_server_ports):
                 flash("All backend server ports are required", "danger")
                 return render_template('HAProxy/edit.html', **item, ssl_cert_path=ssl_cert_content)
-
+            
+            use_ssl = 'use_ssl' in request.form
             ssl_cert_content = request.form.get('ssl_cert_path', '')
+            domain_name = request.form.get('domain_name', '')
             if ssl_cert_content:
                 certificate(f"{haproxy_name}.pem", ssl_cert_content)
                 
@@ -697,9 +729,9 @@ def edit(haproxy_name):
                 'haproxy_name': haproxy_name_new,
                 'frontend_port': request.form['frontend_port'],
                 'protocol': request.form['protocol'],
-                'use_ssl': 'use_ssl' in request.form,
+                'use_ssl': use_ssl,
                 'ssl_cert_path': ssl_cert_content,
-                'domain_name': request.form['domain_name'],
+                'domain_name': domain_name,
                 'lb_method': request.form['lb_method']
             })
 
@@ -798,29 +830,29 @@ def delete(haproxy_name, file_name):
 @app.route("/reset_password", methods=['GET', 'POST'])
 def reset_password():
     if not session.get('logged_in'):
-        return '<script>alert("Harus login dulu"); window.location.href = "/";</script>'
+        return '<script>alert("You must login or session time has been expired"); window.location.href = "/";</script>'
     
     is_user = is_user_exist()
     username = session.get('username')
 
     if username not in is_user:
-        return '<script>alert("User tidak ditemukan"); window.location.href = "/";</script>'
+        return '<script>alert("User not found"); window.location.href = "/";</script>'
 
     if request.method == 'POST':
         new_password = request.form.get('new_password')
         password_confirmation = request.form.get('password_confirmation')
 
         if not new_password or not password_confirmation:
-            return '<script>alert("Harap mengisi semua kolom password"); window.location.href = "/reset_password";</script>'
+            return '<script>alert("Please fill your password"); window.location.href = "/reset_password";</script>'
 
         if new_password == password_confirmation:
             hashed_password = generate_password_hash(new_password)
             is_user[username]['password'] = hashed_password
             save_users(is_user)
             session.clear()
-            return '<script>alert("Password berhasil direset"); window.location.href = "/";</script>'
+            return '<script>alert("The password has been reset"); window.location.href = "/";</script>'
         else:
-            return '<script>alert("Password tidak cocok"); window.location.href = "/reset_password";</script>'
+            return '<script>alert("Password not matches"); window.location.href = "/reset_password";</script>'
     
     return render_template('reset_password.html')
 
