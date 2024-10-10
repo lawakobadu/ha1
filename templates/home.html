@@ -42,13 +42,7 @@
                     </div>
 
                     <a class="btn btn-primary me-2 mb-xl-4" href="{{ url_for('add') }}">Add HAProxy</a>
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-                        {% if messages %}
-                            {% for category, message in messages %}
-                                <div class="alert alert-{{ category }}">{{ message }}</div>
-                            {% endfor %}
-                        {% endif %}
-                    {% endwith %}
+                    
                     <div class="row">
                         <div class="col-md-12 grid-margin stretch-card">
                             <div class="card">
