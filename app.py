@@ -89,7 +89,8 @@ def read_from_file(haproxy_names):
             haproxy_name = match[0].strip()
             if haproxy_name == haproxy_names:
                 frontend_port = match[2].strip()
-                domain_name = match[3].strip()
+                domain_name_http = match[3].strip()
+                domain_name_tcp = match[3].strip()
                 protocol = match[4].strip()
                 # backend_name = match[5].strip()
 
@@ -129,7 +130,8 @@ def read_from_file(haproxy_names):
                     data.append({
                         'haproxy_name': haproxy_name, 
                         'frontend_port': frontend_port, 
-                        'domain_name': domain_name, 
+                        'domain_name_http': domain_name_http, 
+                        'domain_name_tcp': domain_name_tcp, 
                         'protocol': protocol, 
                         'lb_method': lb_method, 
                         'count_server': len(backend_servers),
@@ -144,19 +146,26 @@ def save_to_file(data):
     frontend_port = data.get('frontend_port')
     protocol = data.get('protocol')
     lb_method = data.get('lb_method')
-    use_ssl = data.get('use_ssl', '')
-    ssl_cert_path = data.get('ssl_cert_path', '')
+    use_ssl_http = data.get('use_ssl_http', False)
+    use_ssl_tcp = data.get('use_ssl_tcp', False)
+    ssl_cert_path_http = data.get('ssl_cert_path_http', '')
+    ssl_cert_path_tcp = data.get('ssl_cert_path_tcp', '')
     backend_servers = data.get('backend_servers', [])
-    domain_name = data.get('domain_name', '')
+    domain_name_http = data.get('domain_name_http', '')
+    domain_name_tcp = data.get('domain_name_tcp', '')
 
     # Read configuration file
     with open(CONFIG_FILE_PATH, 'r') as haproxy_cfg_read:
         existing_config = haproxy_cfg_read.read()
     
     # Buat ssl file jika tersedia
-    if use_ssl and ssl_cert_path:
+    if use_ssl_http and ssl_cert_path_http:
         cert_file_name = f"{haproxy_name}.pem"
-        certificate(cert_file_name, ssl_cert_path)
+        certificate(cert_file_name, ssl_cert_path_http)
+    
+    if use_ssl_tcp and ssl_cert_path_tcp:
+        cert_file_name = f"{haproxy_name}.pem"
+        certificate(cert_file_name, ssl_cert_path_tcp)
 
     # Tulis HAProxy konfigurasi
     with open(CONFIG_FILE_PATH, 'a') as haproxy_cfg:
@@ -175,28 +184,45 @@ def save_to_file(data):
 
         # Bind and protocol configurations
         if protocol == 'tcp':
-            if use_ssl:
+            if use_ssl_tcp:
                 haproxy_cfg.write(f"        bind *:{frontend_port} ssl crt /etc/haproxy-dashboard/ssl/{haproxy_name}.pem\n")
                 haproxy_cfg.write(f"        redirect scheme https code 301 if !{{ ssl_fc }}\n")
-                haproxy_cfg.write(f"        # domain_name {domain_name}\n")
+                haproxy_cfg.write(f"        # domain_name {domain_name_tcp}\n")
             else:
                 haproxy_cfg.write(f"        bind *:{frontend_port}\n")
             haproxy_cfg.write(f"        mode tcp\n")
             haproxy_cfg.write(f"        default_backend {haproxy_name}\n")
-        elif protocol == 'http':
-            if use_ssl:
+        
+        if protocol == 'http':
+            if use_ssl_http and domain_name_http != "" and ssl_cert_path_http != "":
                 haproxy_cfg.write(f"        bind *:443 ssl crt /etc/haproxy-dashboard/ssl/{haproxy_name}.pem\n")
                 haproxy_cfg.write(f"        redirect scheme https code 301 if !{{ ssl_fc }}\n")
-                haproxy_cfg.write(f"        # domain_name {domain_name}\n")
+                haproxy_cfg.write(f"        # domain_name {domain_name_http}\n")
                 haproxy_cfg.write(f"        mode http\n")
                 haproxy_cfg.write(f"        # default_backend {haproxy_name}\n")
-                haproxy_cfg.write(f"        acl is_{haproxy_name}_acl hdr(host) -i {domain_name}\n")
+                haproxy_cfg.write(f"        acl is_{haproxy_name}_acl hdr(host) -i {domain_name_http}\n")
+                haproxy_cfg.write(f"        use_backend {haproxy_name} if is_{haproxy_name}_acl\n")
+            if not use_ssl_http and domain_name_http != "" and ssl_cert_path_http == "":
+                haproxy_cfg.write(f"        bind *:80\n")
+                haproxy_cfg.write(f"        # domain_name {domain_name_http}\n")
+                haproxy_cfg.write(f"        mode http\n")
+                haproxy_cfg.write(f"        # default_backend {haproxy_name}\n")
+                haproxy_cfg.write(f"        acl is_{haproxy_name}_acl hdr(host) -i {domain_name_http}\n")
                 haproxy_cfg.write(f"        use_backend {haproxy_name} if is_{haproxy_name}_acl\n")
             else:
                 haproxy_cfg.write(f"        bind *:80\n")
                 haproxy_cfg.write(f"        mode http\n")
                 haproxy_cfg.write(f"        default_backend {haproxy_name}\n")
-
+        
+        # if protocol == 'http':
+        #     if not use_ssl_http and domain_name_http != "" and ssl_cert_path_http == "":
+        #         haproxy_cfg.write(f"        bind *:80\n")
+        #         haproxy_cfg.write(f"        # domain_name {domain_name_http}\n")
+        #         haproxy_cfg.write(f"        mode http\n")
+        #         haproxy_cfg.write(f"        # default_backend {haproxy_name}\n")
+        #         haproxy_cfg.write(f"        acl is_{haproxy_name}_acl hdr(host) -i {domain_name_http}\n")
+        #         haproxy_cfg.write(f"        use_backend {haproxy_name} if is_{haproxy_name}_acl\n")
+        
         # Backend configuration
         haproxy_cfg.write(f"\nbackend {haproxy_name}\n")
         haproxy_cfg.write(f"        balance {lb_method}\n")
@@ -301,6 +327,7 @@ def haproxy_info():
     modes = set()
     haproxy_name = ''
     domain_name = ''
+    ssl_cert_path = ''
     inside_frontend = False
     inside_backend = False
 
@@ -320,7 +347,8 @@ def haproxy_info():
                         'frontend_port': frontend_port,
                         'lb_method': lb_method,
                         'backend_servers': backend_servers,
-                        'modes': modes
+                        'modes': modes,
+                        'ssl_cert_path': ssl_cert_path
                     })
 
                 # Reset variabel untuk frontend baru
@@ -330,6 +358,7 @@ def haproxy_info():
                 lb_method = ''
                 backend_servers = []
                 modes = set()
+                ssl_cert_path = ''
                 inside_frontend = True
                 inside_backend = False
 
@@ -344,6 +373,9 @@ def haproxy_info():
                     bind_parts = line.split()
                     if ':' in bind_parts[1]:  # Assuming bind format is "bind *:80"
                         frontend_port = bind_parts[1].split(':')[1]
+                    
+                if 'ssl crt' in line:
+                    ssl_cert_path = line.split('ssl crt')[1].strip()
 
                 if line.startswith('mode'):
                     mode = line.split()[1]
@@ -376,7 +408,8 @@ def haproxy_info():
                 'frontend_port': frontend_port,
                 'lb_method': lb_method,
                 'backend_servers': backend_servers,
-                'modes': modes
+                'modes': modes,
+                'ssl_cert_path': ssl_cert_path
             })
 
     return haproxy_data, layer7_count, layer4_count
@@ -563,27 +596,30 @@ def add():
     if not session.get('logged_in'):
         return '<script>alert("You must login or session time has been expired"); window.location.href = "/";</script>'
 
+    with open(CONFIG_FILE_PATH, 'r') as haproxy_cfg_read:
+        existing_config = haproxy_cfg_read.read()
+
     if request.method == 'POST':
-        # Ambil data dari form
+        # Get data from the form
         haproxy_name = request.form['haproxy_name']
         backend_server_names = request.form.getlist('backend_server_names')
         backend_server_ips = request.form.getlist('backend_server_ips')
         backend_server_ports = request.form.getlist('backend_server_ports')
 
-        # Validasi input wajib
+        # Validate required inputs
         if not haproxy_name:
             flash("HAProxy name is required", "danger")
             return render_template('HAProxy/add.html')
-        
+
         if not backend_server_names or any(name == '' for name in backend_server_names):
             flash("All backend server names are required", "danger")
             return render_template('HAProxy/add.html')
-        
-        # Validasi agar hanya abjad dan angka yang diterima
+
+        # Validate alphanumeric input
         alphanumeric_pattern = re.compile(r'^[A-Za-z0-9]+$')
         for name in backend_server_names:
             if not alphanumeric_pattern.match(name):
-                flash(f"Backend server name '{name}' is invalid. Only letters and numbers are allowed.", "danger")
+                flash(f"Backend server name '{name}' is invalid. Only letters and numbers are allowed. No spaces.", "danger")
                 return render_template('HAProxy/add.html')
 
         if not backend_server_ips or any(ip == '' for ip in backend_server_ips):
@@ -593,32 +629,74 @@ def add():
         if not backend_server_ports or any(port == '' for port in backend_server_ports):
             flash("All backend server ports are required", "danger")
             return render_template('HAProxy/add.html')
-        
-        # Cek jika SSL diaktifkan
-        use_ssl = 'use_ssl' in request.form and request.form['use_ssl'] == 'on'
-        if use_ssl:
-            ssl_cert_path = request.form.get('ssl_cert_path', '')
-            domain_name = request.form.get('domain_name', '')
 
-            if not ssl_cert_path:
-                flash("SSL Certificate path is required when SSL is enabled", "danger")
-                return render_template('HAProxy/add.html')
+        # Get the selected protocol
+        protocol = request.form.get('protocol', '')
 
-            if not domain_name:
-                flash("Domain Name is required when SSL is enabled", "danger")
-                return render_template('HAProxy/add.html')
+        # Check if SSL is enabled for HTTP
+        use_ssl_http = 'use_ssl_http' in request.form and request.form['use_ssl_http'] == 'on'
+        ssl_cert_path_http = ''
+        domain_name_http = ''
 
-        # Siapkan data setelah validasi
+        # Handle HTTP domain name logic
+        if protocol == 'http':
+            http_port_80_exists = "bind *:80" in existing_config and "mode http" in existing_config
+
+            # If HTTP on port 80 already exists, domain_name_http is required
+            if http_port_80_exists:
+                domain_name_http = request.form.get('domain_name_http', '')
+                if not domain_name_http:
+                    flash("Domain Name is required for existing HTTP configuration on port 80", "danger")
+                    return render_template('HAProxy/add.html')
+            else:
+                # If HTTP on port 80 doesn't exist, domain_name_http is optional
+                domain_name_http = request.form.get('domain_name_http', '')
+
+            if use_ssl_http:
+                ssl_cert_path_http = request.form.get('ssl_cert_path_http', '')
+
+                if not ssl_cert_path_http:
+                    flash("SSL Certificate path is required when SSL is enabled", "danger")
+                    return render_template('HAProxy/add.html')
+
+                # Bind to port 443 if SSL cert path is provided
+                if not domain_name_http:
+                    flash("Domain Name is required when SSL is enabled", "danger")
+                    return render_template('HAProxy/add.html')
+
+        # Check if SSL is enabled for TCP
+        use_ssl_tcp = 'use_ssl_tcp' in request.form and request.form['use_ssl_tcp'] == 'on'
+        ssl_cert_path_tcp = ''
+        domain_name_tcp = ''
+
+        if protocol == 'tcp':
+            if use_ssl_tcp:
+                ssl_cert_path_tcp = request.form.get('ssl_cert_path_tcp', '')
+                domain_name_tcp = request.form.get('domain_name_tcp', '')
+
+                if not ssl_cert_path_tcp:
+                    flash("SSL Certificate path is required when SSL is enabled", "danger")
+                    return render_template('HAProxy/add.html')
+
+                if not domain_name_tcp:
+                    flash("Domain Name is required when SSL is enabled", "danger")
+                    return render_template('HAProxy/add.html')
+
+        # Prepare data after validation
         lb_method = request.form['lb_method']
+        frontend_port = request.form['frontend_port']
 
         data = {
             'haproxy_name': haproxy_name,
-            'frontend_port': request.form['frontend_port'],
+            'frontend_port': frontend_port,
             'lb_method': lb_method,
-            'protocol': request.form['protocol'],
-            'use_ssl': use_ssl,
-            'ssl_cert_path': ssl_cert_path if use_ssl else '',
-            'domain_name': domain_name if use_ssl else ''
+            'protocol': protocol,
+            'use_ssl_http': use_ssl_http,
+            'use_ssl_tcp': use_ssl_tcp,
+            'ssl_cert_path_http': ssl_cert_path_http,
+            'ssl_cert_path_tcp': ssl_cert_path_tcp,
+            'domain_name_http': domain_name_http,
+            'domain_name_tcp': domain_name_tcp
         }
 
         if lb_method == 'roundrobin':
@@ -628,47 +706,47 @@ def add():
                 backend_server_ips,
                 backend_server_ports,
                 request.form.getlist('backend_server_weights')
-        ))
+            ))
         else:
             # For other methods, omit weights
             data['backend_servers'] = list(zip(
                 backend_server_names,
                 backend_server_ips,
                 backend_server_ports
-        ))
+            ))
 
-        # Baca konfigurasi yang ada
+        # Read the existing configuration
         with open(CONFIG_FILE_PATH, 'r') as haproxy_cfg_read:
             existing_config = haproxy_cfg_read.read()
 
-        # Cek apakah HAProxy sudah ada
+        # Check if HAProxy name already exists
         if haproxy_name in existing_config:
             flash(f"{haproxy_name} HAProxy is exist", "danger")
             return render_template('HAProxy/add.html', **data)
 
-        # Cek apakah port sudah digunakan
-        if data['protocol'] == 'tcp' and f"bind *:{data['frontend_port']}" in existing_config:
-            flash(f"Port {data['frontend_port']} is already use in TCP protocol", "danger")
+        # Check if TCP port is already in use
+        if protocol == 'tcp' and f"bind *:{frontend_port}" in existing_config:
+            flash(f"Port {frontend_port} is already use in TCP protocol", "danger")
             return render_template('HAProxy/add.html', **data)
+        
+        # if data['protocol'] == 'http' in existing_config and not f"# domain_name {domain_name_http}" in existing_config and "bind *:80" in existing_config:
+        #     flash("Port 80 is already in use. Please use a domain if you want to use the HTTP protocol.", "danger")
+        #     return render_template('HAProxy/add.html', **data)
 
-        if data['protocol'] == 'http' and not data['use_ssl'] and "bind *:80" in existing_config:
-            flash("Port 80 is already in use. Please use a domain if you want to use the HTTP protocol.", "danger")
-            return render_template('HAProxy/add.html', **data)
-
-        # Simpan konfigurasi
+        # Save the configuration
         save_to_file(data)
 
         if 'save_reload_create' in request.form:
-            # Jalankan haproxy -c -V -f untuk cek konfigurasi
+            # Run haproxy -c -V -f to check configuration
             check_result = subprocess.run(['haproxy', '-c', '-V', '-f', CONFIG_FILE_PATH], capture_output=True, text=True)
             check_output = check_result.stdout
 
-            # Jika ada error, tambahkan ke output
+            # If an error occurs, add it to the output
             if check_result.returncode != 0:
                 error_message = check_result.stderr
                 check_output += f"\n\nError occurred:\n{error_message}"
             else:
-                # Jika tidak ada error, reload HAProxy
+                # If no errors, reload HAProxy
                 reload_result = subprocess.run(['systemctl', 'reload', 'haproxy', CONFIG_FILE_PATH], capture_output=True, text=True)
                 check_output += f"\n\nHAProxy Restart Output:\n{reload_result.stdout}"
 
@@ -682,7 +760,8 @@ def edit(haproxy_name):
     if not session.get('logged_in'):
         return '<script>alert("You must login or session time has been expired"); window.location.href = "/";</script>'
     
-    ssl_cert_content = ''
+    ssl_cert_content_http = ''
+    ssl_cert_content_tcp = ''
 
     data = read_from_file(haproxy_name)
     item = next((d for d in data if d['haproxy_name'] == haproxy_name), None)
@@ -698,42 +777,95 @@ def edit(haproxy_name):
             # Validasi input wajib
             if not haproxy_name_new:
                 flash("HAProxy name is required", "danger")
-                return render_template('HAProxy/edit.html', **item, ssl_cert_path=ssl_cert_content)
+                return render_template('HAProxy/edit.html', **item, ssl_cert_path_http=ssl_cert_content_http, ssl_cert_path_tcp=ssl_cert_content_tcp)
 
             if not backend_server_names or any(name == '' for name in backend_server_names):
                 flash("All backend server names are required", "danger")
-                return render_template('HAProxy/edit.html', **item, ssl_cert_path=ssl_cert_content)
+                return render_template('HAProxy/edit.html', **item, ssl_cert_path_http=ssl_cert_content_http, ssl_cert_path_tcp=ssl_cert_content_tcp)
             
             # Validasi agar hanya abjad dan angka yang diterima
             alphanumeric_pattern = re.compile(r'^[A-Za-z0-9]+$')
             for name in backend_server_names:
                 if not alphanumeric_pattern.match(name):
                     flash(f"Backend server name '{name}' is invalid. Only letters and numbers are allowed.", "danger")
-                    return render_template('HAProxy/edit.html', **item, ssl_cert_path=ssl_cert_content)
+                    return render_template('HAProxy/edit.html', **item, ssl_cert_path_http=ssl_cert_content_http, ssl_cert_path_tcp=ssl_cert_content_tcp)
 
             if not backend_server_ips or any(ip == '' for ip in backend_server_ips):
                 flash("All backend server IPs are required", "danger")
-                return render_template('HAProxy/edit.html', **item, ssl_cert_path=ssl_cert_content)
+                return render_template('HAProxy/edit.html', **item, ssl_cert_path_http=ssl_cert_content_http, ssl_cert_path_tcp=ssl_cert_content_tcp)
 
             if not backend_server_ports or any(port == '' for port in backend_server_ports):
                 flash("All backend server ports are required", "danger")
-                return render_template('HAProxy/edit.html', **item, ssl_cert_path=ssl_cert_content)
-            
-            use_ssl = 'use_ssl' in request.form
-            ssl_cert_content = request.form.get('ssl_cert_path', '')
-            domain_name = request.form.get('domain_name', '')
-            if ssl_cert_content:
-                certificate(f"{haproxy_name}.pem", ssl_cert_content)
-                
-            item.update({
-                'haproxy_name': haproxy_name_new,
-                'frontend_port': request.form['frontend_port'],
-                'protocol': request.form['protocol'],
-                'use_ssl': use_ssl,
-                'ssl_cert_path': ssl_cert_content,
-                'domain_name': domain_name,
-                'lb_method': request.form['lb_method']
-            })
+                return render_template('HAProxy/edit.html', **item, ssl_cert_path_http=ssl_cert_content_http, ssl_cert_path_tcp=ssl_cert_content_tcp)
+
+            # Logika khusus berdasarkan protokol HTTP atau TCP
+            if request.form['protocol'] == 'http':
+                # Logika untuk HTTP
+                use_ssl_http = 'use_ssl_http' in request.form and request.form['use_ssl_http'] == 'on'
+                ssl_cert_path_http = ''
+                domain_name_http = ''
+
+                with open(CONFIG_FILE_PATH, 'r') as haproxy_cfg_read:
+                    existing_config = haproxy_cfg_read.read()
+
+                http_port_80_exists = "bind *:80" in existing_config and "mode http" in existing_config and "acl" not in existing_config
+
+                if http_port_80_exists:
+                    domain_name_http = request.form.get('domain_name_http', '')
+                    if not domain_name_http:
+                        flash("Domain Name is required for existing HTTP configuration on port 80", "danger")
+                        return render_template('HAProxy/edit.html', **item, ssl_cert_path_http=ssl_cert_content_http, ssl_cert_path_tcp=ssl_cert_content_tcp)
+                else:
+                    domain_name_http = request.form.get('domain_name_http', '')
+
+                if use_ssl_http:
+                    ssl_cert_path_http = request.form.get('ssl_cert_path_http', '')
+
+                    if not ssl_cert_path_http:
+                        flash("SSL Certificate path is required when SSL is enabled", "danger")
+                        return render_template('HAProxy/edit.html', **item, ssl_cert_path_http=ssl_cert_content_http, ssl_cert_path_tcp=ssl_cert_content_tcp)
+
+                    if not domain_name_http:
+                        flash("Domain Name is required when SSL is enabled", "danger")
+                        return render_template('HAProxy/edit.html', **item, ssl_cert_path_http=ssl_cert_content_http, ssl_cert_path_tcp=ssl_cert_content_tcp)
+
+                item.update({
+                    'haproxy_name': haproxy_name_new,
+                    'frontend_port': request.form['frontend_port'],
+                    'protocol': request.form['protocol'],
+                    'use_ssl': use_ssl_http,
+                    'ssl_cert_path_http': ssl_cert_path_http,
+                    'domain_name_http': domain_name_http,
+                    'lb_method': request.form['lb_method']
+                })
+
+            elif request.form['protocol'] == 'tcp':
+                # Logika untuk TCP
+                use_ssl_tcp = 'use_ssl_tcp' in request.form and request.form['use_ssl_tcp'] == 'on'
+                ssl_cert_path_tcp = ''
+                domain_name_tcp = ''
+
+                if use_ssl_tcp:
+                    ssl_cert_path_tcp = request.form.get('ssl_cert_path_tcp', '')
+                    domain_name_tcp = request.form.get('domain_name_tcp', '')
+
+                    if not ssl_cert_path_tcp:
+                        flash("SSL Certificate path is required when SSL is enabled", "danger")
+                        return render_template('HAProxy/edit.html', **item, ssl_cert_path_http=ssl_cert_content_http, ssl_cert_path_tcp=ssl_cert_content_tcp)
+
+                    if not domain_name_tcp:
+                        flash("Domain Name is required when SSL is enabled", "danger")
+                        return render_template('HAProxy/edit.html', **item, ssl_cert_path_http=ssl_cert_content_http, ssl_cert_path_tcp=ssl_cert_content_tcp)
+
+                item.update({
+                    'haproxy_name': haproxy_name_new,
+                    'frontend_port': request.form['frontend_port'],
+                    'protocol': request.form['protocol'],
+                    'use_ssl': use_ssl_tcp,
+                    'ssl_cert_path_tcp': ssl_cert_path_tcp,
+                    'domain_name_tcp': domain_name_tcp,
+                    'lb_method': request.form['lb_method']
+                })
 
             if item['lb_method'] == 'roundrobin':
                 item['backend_servers'] = list(zip(
@@ -748,23 +880,18 @@ def edit(haproxy_name):
                     backend_server_ips,
                     backend_server_ports
                 ))
-                
+
             # Step 2: Delete the old configuration
             delete_conf(haproxy_name)
-                
-            # Read current configuration to check for existing frontends and ports
+            
+            # Check port if already used
             with open(CONFIG_FILE_PATH, 'r') as haproxy_cfg_read:
                 existing_config = haproxy_cfg_read.read()
 
-            # Check port if already used
             if item['protocol'] == 'tcp' and f"bind *:{item['frontend_port']}" in existing_config:
                 flash(f"Port {item['frontend_port']} is already used in TCP protocol", "danger")
                 return redirect(url_for('edit', haproxy_name=haproxy_name))
 
-            if item['protocol'] == 'http' and not item['use_ssl'] and "bind *:80" in existing_config:
-                flash("Port 80 is already in use. Please use a domain if you want to use the HTTP protocol.", "danger")
-                return redirect(url_for('edit', haproxy_name=haproxy_name))
-            
             # Step 3: Save the new configuration to the file
             save_to_file(item)
 
@@ -783,13 +910,20 @@ def edit(haproxy_name):
 
             return redirect(url_for('home'))
 
-    ssl_cert_file = os.path.join(SSL_FILE_PATH, f"{haproxy_name}.pem")
+    # Baca file SSL certificate untuk HTTP
+    ssl_cert_file_http = os.path.join(SSL_FILE_PATH, f"{haproxy_name}.pem")
+    if os.path.isfile(ssl_cert_file_http):
+        with open(ssl_cert_file_http, 'r') as file:
+            ssl_cert_content_http = file.read()
 
-    if os.path.isfile(ssl_cert_file):
-        with open(ssl_cert_file, 'r') as file:
-            ssl_cert_content = file.read()
+    # Baca file SSL certificate untuk TCP
+    ssl_cert_file_tcp = os.path.join(SSL_FILE_PATH, f"{haproxy_name}.pem")
+    if os.path.isfile(ssl_cert_file_tcp):
+        with open(ssl_cert_file_tcp, 'r') as file:
+            ssl_cert_content_tcp = file.read()
 
-    return render_template('HAProxy/edit.html', **item, ssl_cert_path=ssl_cert_content)
+    return render_template('HAProxy/edit.html', **item, ssl_cert_path_http=ssl_cert_content_http, ssl_cert_path_tcp=ssl_cert_content_tcp)
+
 
 
 @app.route("/delete/<haproxy_name>/<file_name>", methods=['POST'])

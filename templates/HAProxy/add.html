@@ -46,7 +46,7 @@
                                             <h4 class="card-title"><i class="mdi mdi-web"></i> Add new configuration</h4>
                                             <div class="form-group">
                                                 <label for="exampleInputName1">Haproxy Name</label>
-                                                <input type="text" class="form-control" id="haproxy_name" placeholder="Haproxy Name" name="haproxy_name" value="{{ request.form['haproxy_name'] }}" required>
+                                                <input type="text" class="form-control" id="haproxy_name" placeholder="Haproxy Name" name="haproxy_name" pattern="\S+" title="No spaces" value="{{ request.form['haproxy_name'] }}" required>
                                             </div>
                                             <div class="form-group">
                                                 <div class="col">
@@ -59,27 +59,50 @@
                                                 </div>
                                                 <small class="text-danger">*if only using http auto redirect port 80. if checklist ssl box, auto redirect port 443</small>
                                             </div>
-                                            <div class="form-group" id="frontend_port_group" style="display: none;">
-                                                <label for="exampleInputNamePort">Frontend Port</label>
-                                                <input type="text" class="form-control" id="frontend_port" placeholder="Frontend Port" name="frontend_port" value="{{ request.form['frontend_port'] }}" oninput="validateIP(event)">
-                                            </div>                                            
-                                            <div class="form-group">
-                                                <div class="form-check">
-                                                    <label class="form-check-label">
-                                                        <i class="mdi mdi-lock"></i>
-                                                        <input type="checkbox" class="form-check-input" id="use_ssl" name="use_ssl" onchange="toggleSSLFields()"> Use SSL Certificate
-                                                    </label>
-                                                </div>
-                                            </div>
-                                            <div class="ssl_fields" id="ssl_fields" style="display: none;">
-                                                <div class="form-group">
-                                                    <label for="exampleInputSSL">SSL Certificate:</label>
-                                                    <textarea class="form-control" name="ssl_cert_path" id="ssl_cert_path" rows="10">{{ request.form['ssl_cert_path'] }}</textarea>
-                                                    <span>Here's auto redirect HTTPS</span>
-                                                </div>
+                                            <div class="protocol-http" id="protocol-http" style="display: none;">
                                                 <div class="form-group">
                                                     <label for="exampleInputName2">Domain Name</label>
-                                                    <input type="text" class="form-control" id="domain_name" placeholder="Domain Name" name="domain_name" value="{{ request.form['domain_name'] }}">
+                                                    <input type="text" class="form-control" id="domain_name_http" placeholder="Domain Name" name="domain_name_http" value="{{ request.form['domain_name_http'] }}">
+                                                </div>
+                                                <div class="form-group">
+                                                    <div class="form-check">
+                                                        <label class="form-check-label">
+                                                            <i class="mdi mdi-lock"></i>
+                                                            <input type="checkbox" class="form-check-input" id="use_ssl_http" name="use_ssl_http" onchange="toggleSSLFields()"> Use SSL Certificate
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <div class="ssl_fields" id="ssl_fields_http" style="display: none;">
+                                                    <div class="form-group">
+                                                        <label for="exampleInputSSL">SSL Certificate:</label>
+                                                        <textarea class="form-control" name="ssl_cert_path_http" id="ssl_cert_path_http" rows="10">{{ request.form['ssl_cert_path_http'] }}</textarea>
+                                                        <span>Here's auto redirect HTTPS</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="protocol-tcp" id="protocol-tcp" style="display: none;">
+                                                <div class="form-group">
+                                                    <label for="exampleInputNamePort">Frontend Port</label>
+                                                    <input type="text" class="form-control" id="frontend_port" placeholder="Frontend Port" name="frontend_port" value="{{ request.form['frontend_port'] }}" oninput="validateIP(event)">
+                                                </div>
+                                                <div class="form-group">
+                                                    <div class="form-check">
+                                                        <label class="form-check-label">
+                                                            <i class="mdi mdi-lock"></i>
+                                                            <input type="checkbox" class="form-check-input" id="use_ssl_tcp" name="use_ssl_tcp" onchange="toggleSSLFields()"> Use SSL Certificate
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <div class="ssl_fields" id="ssl_fields_tcp" style="display: none;">
+                                                    <div class="form-group">
+                                                        <label for="exampleInputSSL">SSL Certificate:</label>
+                                                        <textarea class="form-control" name="ssl_cert_path_tcp" id="ssl_cert_path_tcp" rows="10">{{ request.form['ssl_cert_path_tcp'] }}</textarea>
+                                                        <span>Here's auto redirect HTTPS</span>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="exampleInputName2">Domain Name</label>
+                                                        <input type="text" class="form-control" id="domain_name_tcp" placeholder="Domain Name" name="domain_name_tcp" value="{{ request.form['domain_name_tcp'] }}">
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -108,7 +131,7 @@
                                             <div class="form-group row g-3 align-items-end">
                                                 <div class="col">
                                                     <label for="exampleInputName1">Server 1 Name</label>
-                                                    <input type="text" class="form-control" id="backend_server_names" placeholder="Server 1 Name" name="backend_server_names" pattern="[A-Za-z0-9]+" title="Only letters and numbers are allowed" value="{{ request.form['backend_server_names'] }}" required>
+                                                    <input type="text" class="form-control" id="backend_server_names" placeholder="Server 1 Name" name="backend_server_names" pattern="[A-Za-z0-9]+" title="Only letters and numbers are allowed. No spaces." value="{{ request.form['backend_server_names'] }}" required>
                                                 </div>
                                                 <div class="col">
                                                     <label for="exampleInputName2">IP Address</label>
@@ -178,21 +201,33 @@
     </script> -->
     <script>
         function toggleSSLFields() {
-            const checkbox = document.getElementById('use_ssl');
-            const sslCertPath = document.getElementById('ssl_cert_path');
-            const domainName = document.getElementById('domain_name');
+            const checkbox_http = document.getElementById('use_ssl_http');
+            const checkbox_tcp = document.getElementById('use_ssl_tcp');
+            const sslCertPath_http = document.getElementById('ssl_cert_path_http');
+            const sslCertPath_tcp = document.getElementById('ssl_cert_path_tcp');
+            const domainName_http = document.getElementById('domain_name_http');
+            const domainName_tcp = document.getElementById('domain_name_tcp');
     
-            if (checkbox.checked) {
-                sslCertPath.setAttribute('required', true);
-                domainName.setAttribute('required', true);
+            if (checkbox_http.checked) {
+                sslCertPath_http.setAttribute('required', true);
+                domainName_http.setAttribute('required', true);
             } else {
-                sslCertPath.removeAttribute('required');
-                domainName.removeAttribute('required');
+                sslCertPath_http.removeAttribute('required');
+                domainName_http.removeAttribute('required');
+            }
+            
+            if (checkbox_tcp.checked) {
+                sslCertPath_tcp.setAttribute('required', true);
+                domainName_tcp.setAttribute('required', true);
+            } else {
+                sslCertPath_tcp.removeAttribute('required');
+                domainName_tcp.removeAttribute('required');
             }
         }
     
         // Menambahkan event listener pada checkbox
-        document.getElementById('use_ssl').addEventListener('change', toggleSSLFields);
+        document.getElementById('use_ssl_http').addEventListener('change', toggleSSLFields);
+        document.getElementById('use_ssl_tcp').addEventListener('change', toggleSSLFields);
     </script>
     <script>
         function validateIP(event) {
@@ -208,22 +243,33 @@
 
         function protocolFunction() {
             let protocol = document.getElementById("protocol").value;
-            let frontendPortGroup = document.getElementById("frontend_port_group");
+            let protocolhttp = document.getElementById("protocol-http");
+            let protocoltcp = document.getElementById("protocol-tcp");
 
-            // Hide both sections initially
-            frontendPortGroup.style.display = 'none'; // Hide the Frontend Port input initially
+            protocolhttp.style.display = 'none';
+            protocoltcp.style.display = 'none';
 
             if (protocol === "http") {
-                frontendPortGroup.style.display = 'none';
+                protocolhttp.style.display = 'block';
+                protocoltcp.style.display = 'none';
             } else if (protocol === "tcp") {
-                frontendPortGroup.style.display = 'block';
+                protocolhttp.style.display = 'none';
+                protocoltcp.style.display = 'block';
             }
         }
 
-        // Function to toggle SSL fields
         document.addEventListener('DOMContentLoaded', function () {
-            document.getElementById('use_ssl').addEventListener('change', function () {
-                document.getElementById('ssl_fields').style.display = this.checked ? 'block' : 'none';
+            protocolFunction();
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('use_ssl_http').addEventListener('change', function () {
+                let sslFieldsHttp = document.getElementById('ssl_fields_http');
+                sslFieldsHttp.style.display = this.checked ? 'block' : 'none';
+            });
+            document.getElementById('use_ssl_tcp').addEventListener('change', function () {
+                let sslFieldsTcp = document.getElementById('ssl_fields_tcp');
+                sslFieldsTcp.style.display = this.checked ? 'block' : 'none';
             });
         });
     </script>
@@ -254,6 +300,10 @@
                 weightField.style.display = "none";
             }
         }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            lbMethodFunction();
+        });
     
         function addBackend() {
             // Menambah counter untuk label backend server
@@ -389,15 +439,6 @@
                 inputName.setAttribute("placeholder", "Server " + backendCounter + " Name");
             });
         }
-
-        // Jalankan fungsi ini saat halaman dimuat untuk memeriksa status awal
-        document.addEventListener('DOMContentLoaded', function () {
-            lbMethodFunction();
-        });
-
-        document.addEventListener('DOMContentLoaded', function () {
-            protocolFunction();
-        });
     </script> 
         <!-- plugins:js -->
         <script src="{{url_for('static', filename='vendors/js/vendor.bundle.base.js')}}"></script>

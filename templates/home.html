@@ -83,7 +83,7 @@
                                                             {% endif %}
                                                         </td>
                                                         <td>
-                                                            {% if haproxy.domain_name %}
+                                                            {% if haproxy.ssl_cert_path %}
                                                                 Manual
                                                             {% else %}
                                                                 None
@@ -101,14 +101,19 @@
                                                             {% endfor %}
                                                         </td>
                                                         <td>
-                                                            <a target="_blank" class="text-black" href="{% if haproxy.domain_name %}https://{{ haproxy.domain_name }}{% if 'tcp' in haproxy.modes %}:{{ haproxy.frontend_port }}{% endif %}{% else %}http://{{ request.host.split(':')[0] }}{% if 'tcp' in haproxy.modes %}:{{ haproxy.frontend_port }}{% endif %}{% endif %}">
-                                                                {% if haproxy.domain_name %}
-                                                                    https://{{ haproxy.domain_name }}{% if 'tcp' in haproxy.modes %}:{{ haproxy.frontend_port }}{% endif %}
+                                                            <a target="_blank" class="text-black" href="{% if haproxy.ssl_cert_path %}https://{% else %}http://{% endif %}{% if haproxy.domain_name %}{{ haproxy.domain_name }}{% if 'tcp' in haproxy.modes %}:{{ haproxy.frontend_port }}{% endif %}{% else %}{{ request.host.split(':')[0] }}{% if 'tcp' in haproxy.modes %}:{{ haproxy.frontend_port }}{% endif %}{% endif %}">
+                                                                {% if haproxy.ssl_cert_path %}
+                                                                    https://
                                                                 {% else %}
-                                                                    http://{{ request.host.split(':')[0] }}{% if 'tcp' in haproxy.modes %}:{{ haproxy.frontend_port }}{% endif %}
+                                                                    http://
+                                                                {% endif %}
+                                                                {% if haproxy.domain_name %}
+                                                                    {{ haproxy.domain_name }}{% if 'tcp' in haproxy.modes %}:{{ haproxy.frontend_port }}{% endif %}
+                                                                {% else %}
+                                                                    {{ request.host.split(':')[0] }}{% if 'tcp' in haproxy.modes %}:{{ haproxy.frontend_port }}{% endif %}
                                                                 {% endif %}
                                                             </a>
-                                                        </td>
+                                                        </td>                                                        
                                                         <td>
                                                             <div class="dropdown">
                                                                 <button type="button" class="btn" id="dropdownMenuIconButton3" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">

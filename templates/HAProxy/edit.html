@@ -42,46 +42,71 @@
                             <div class="row">
                                 <div class="col-12 grid-margin stretch-card">
                                     <div class="card">
-                                    <div class="card-body">
-                                        <h4 class="card-title"><i class="mdi mdi-web"></i>Update configuration</h4>
-                                        <div class="form-group">
-                                            <label for="exampleInputName1">Haproxy Name</label>
-                                            <input type="text" class="form-control" id="exampleInputName1" placeholder="Haproxy Name" name="haproxy_name" value="{{ haproxy_name }}" required>
-                                        </div>
-                                        <div class="form-group">
-                                            <div class="col">
-                                                <label for="exampleFormControlSelect4">Protocol</label>
-                                                <select class="form-select form-select-sm" name="protocol" id="protocol" onchange="protocolFunction()">
-                                                <option value="" disabled selected>--Select protocol--</option>
-                                                <option value="http" {% if protocol == 'http' %}selected{% endif %}>HTTP</option>
-                                                <option value="tcp" {% if protocol == 'tcp' %}selected{% endif %}>TCP</option>
-                                                </select>
+                                        <div class="card-body">
+                                            <h4 class="card-title"><i class="mdi mdi-web"></i>Update configuration</h4>
+                                            <div class="form-group">
+                                                <label for="exampleInputName1">Haproxy Name</label>
+                                                <input type="text" class="form-control" id="exampleInputName1" placeholder="Haproxy Name" name="haproxy_name" value="{{ haproxy_name }}" required>
                                             </div>
-                                        </div>
-                                        <div class="form-group" id="frontend_port_group" style="display: none;">
-                                            <label for="exampleInputNamePort">Frontend Port</label>
-                                            <input type="text" class="form-control" id="exampleInputNamePort" placeholder="Frontend Port" name="frontend_port" value="{{ frontend_port }}" oninput="validateIP(event)">
-                                        </div>
-                                        <div class="form-group">
-                                            <div class="form-check">
-                                                <label class="form-check-label">
-                                                <i class="mdi mdi-lock"></i><input type="checkbox" class="form-check-input" id="use_ssl" name="use_ssl" {% if ssl_cert_path %} checked {% endif %} onchange="toggleSSLFields()"> Use SSL Certificate </label>
-                                            </div>
-                                        </div>
-                                        <div class="ssl_fields" id="ssl_fields" style="display: none;">
-                                                <div class="form-group">
-                                                    <label for="exampleInputSSL">SSL Certificate:</label>
-                                                    <textarea class="form-control" name="ssl_cert_path" id="ssl_cert_path" rows="10">{{ ssl_cert_path }}</textarea>
-                                                    <span>Here's auto redirect HTTPS</span>
-                                                </div>
-                                                <div class="form-group">
-                                                    <label for="exampleInputDomain">Domain Name</label>
-                                                    <input type="text" class="form-control" id="domain_name" placeholder="Domain Name" name="domain_name" value="{{ domain_name }}">
+                                            <div class="form-group">
+                                                <div class="col">
+                                                    <label for="exampleFormControlSelect4">Protocol</label>
+                                                    <select class="form-select form-select-sm" name="protocol" id="protocol" onchange="protocolFunction()">
+                                                    <option value="" disabled selected>--Select protocol--</option>
+                                                    <option value="http" {% if protocol == 'http' %}selected{% endif %}>HTTP</option>
+                                                    <option value="tcp" {% if protocol == 'tcp' %}selected{% endif %}>TCP</option>
+                                                    </select>
                                                 </div>
                                             </div>
+                                            <div class="protocol-http" id="protocol-http" style="display: none;">
+                                                <div class="form-group">
+                                                    <label for="exampleInputName2">Domain Name</label>
+                                                    <input type="text" class="form-control" id="domain_name_http" placeholder="Domain Name" name="domain_name_http" value="{{ domain_name_http }}">
+                                                </div>
+                                                <div class="form-group">
+                                                    <div class="form-check">
+                                                        <label class="form-check-label">
+                                                            <i class="mdi mdi-lock"></i>
+                                                            <input type="checkbox" class="form-check-input" id="use_ssl_http" name="use_ssl_http" {% if ssl_cert_path_http %} checked {% endif %} onchange="toggleSSLFields()"> Use SSL Certificate
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <div class="ssl_fields" id="ssl_fields_http" style="display: none;">
+                                                    <div class="form-group">
+                                                        <label for="exampleInputSSL">SSL Certificate:</label>
+                                                        <textarea class="form-control" name="ssl_cert_path_http" id="ssl_cert_path_http" rows="10">{{ ssl_cert_path_http }}</textarea>
+                                                        <span>Here's auto redirect HTTPS</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="protocol-tcp" id="protocol-tcp" style="display: none;">
+                                                <div class="form-group">
+                                                    <label for="exampleInputNamePort">Frontend Port</label>
+                                                    <input type="text" class="form-control" id="frontend_port" placeholder="Frontend Port" name="frontend_port" value="{{ frontend_port }}" oninput="validateIP(event)">
+                                                </div>
+                                                <div class="form-group">
+                                                    <div class="form-check">
+                                                        <label class="form-check-label">
+                                                            <i class="mdi mdi-lock"></i>
+                                                            <input type="checkbox" class="form-check-input" id="use_ssl_tcp" name="use_ssl_tcp" {% if ssl_cert_path_tcp %} checked {% endif %} onchange="toggleSSLFields()"> Use SSL Certificate
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <div class="ssl_fields" id="ssl_fields_tcp" style="display: none;">
+                                                    <div class="form-group">
+                                                        <label for="exampleInputSSL">SSL Certificate:</label>
+                                                        <textarea class="form-control" name="ssl_cert_path_tcp" id="ssl_cert_path_tcp" rows="10">{{ ssl_cert_path_tcp }}</textarea>
+                                                        <span>Here's auto redirect HTTPS</span>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="exampleInputName2">Domain Name</label>
+                                                        <input type="text" class="form-control" id="domain_name_tcp" placeholder="Domain Name" name="domain_name_tcp" value="{{ domain_name_tcp }}">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
                             </div>
                             <div class="row">
                                 <div class="col-12 grid-margin stretch-card">
@@ -151,52 +176,80 @@
         }
 
         function toggleSSLFields() {
-            const checkbox = document.getElementById('use_ssl');
-            const sslCertPath = document.getElementById('ssl_cert_path');
-            const domainName = document.getElementById('domain_name');
+            const checkbox_http = document.getElementById('use_ssl_http');
+            const checkbox_tcp = document.getElementById('use_ssl_tcp');
+            const sslCertPath_http = document.getElementById('ssl_cert_path_http');
+            const sslCertPath_tcp = document.getElementById('ssl_cert_path_tcp');
+            const domainName_http = document.getElementById('domain_name_http');
+            const domainName_tcp = document.getElementById('domain_name_tcp');
     
-            if (checkbox.checked) {
-                sslCertPath.setAttribute('required', true);
-                domainName.setAttribute('required', true);
+            if (checkbox_http.checked) {
+                sslCertPath_http.setAttribute('required', true);
+                domainName_http.setAttribute('required', true);
             } else {
-                sslCertPath.removeAttribute('required');
-                domainName.removeAttribute('required');
+                sslCertPath_http.removeAttribute('required');
+                domainName_http.removeAttribute('required');
+            }
+            
+            if (checkbox_tcp.checked) {
+                sslCertPath_tcp.setAttribute('required', true);
+                domainName_tcp.setAttribute('required', true);
+            } else {
+                sslCertPath_tcp.removeAttribute('required');
+                domainName_tcp.removeAttribute('required');
             }
         }
     
         // Menambahkan event listener pada checkbox
-        document.getElementById('use_ssl').addEventListener('change', toggleSSLFields);
+        document.getElementById('use_ssl_http').addEventListener('change', toggleSSLFields);
+        document.getElementById('use_ssl_tcp').addEventListener('change', toggleSSLFields);
 
         function protocolFunction() {
             let protocol = document.getElementById("protocol").value;
-            let frontendPortGroup = document.getElementById("frontend_port_group");
+            let protocolhttp = document.getElementById("protocol-http");
+            let protocoltcp = document.getElementById("protocol-tcp");
+
+            protocolhttp.style.display = 'none';
+            protocoltcp.style.display = 'none';
 
             if (protocol === "http") {
-                frontendPortGroup.style.display = 'none';
+                protocolhttp.style.display = 'block';
+                protocoltcp.style.display = 'none';
             } else if (protocol === "tcp") {
-                frontendPortGroup.style.display = 'block';
+                protocolhttp.style.display = 'none';
+                protocoltcp.style.display = 'block';
             }
         }
 
-        // Function to toggle SSL fields
         document.addEventListener('DOMContentLoaded', function () {
-            var sslCheckbox = document.getElementById('use_ssl');
-            var sslFields = document.getElementById('ssl_fields');
+            protocolFunction();
+        });
 
-            // Function to update ssl_fields display based on checkbox state
-            function updateSslFields() {
-                sslFields.style.display = sslCheckbox.checked ? 'block' : 'none';
+        document.addEventListener('DOMContentLoaded', function () {
+            // Fungsi untuk menampilkan atau menyembunyikan field SSL berdasarkan checkbox
+            function toggleSSLField(checkboxId, sslFieldId) {
+                let checkbox = document.getElementById(checkboxId);
+                let sslField = document.getElementById(sslFieldId);
+                sslField.style.display = checkbox.checked ? 'block' : 'none';
             }
 
-            // Set initial display of ssl_fields based on checkbox state
-            updateSslFields();
+            // Cek status checkbox SSL dan atur tampilan awal dari ssl_fields_http
+            toggleSSLField('use_ssl_http', 'ssl_fields_http');
 
-            // Add event listener to update display when checkbox state changes
-            sslCheckbox.addEventListener('change', updateSslFields);
+            // Cek status checkbox SSL dan atur tampilan awal dari ssl_fields_tcp
+            toggleSSLField('use_ssl_tcp', 'ssl_fields_tcp');
 
-            // Call your protocol function if needed
-            protocolFunction(); // Initial check based on current protocol value
+            // Tambahkan event listener untuk perubahan pada checkbox use_ssl_http
+            document.getElementById('use_ssl_http').addEventListener('change', function () {
+                toggleSSLField('use_ssl_http', 'ssl_fields_http');
+            });
+
+            // Tambahkan event listener untuk perubahan pada checkbox use_ssl_tcp
+            document.getElementById('use_ssl_tcp').addEventListener('change', function () {
+                toggleSSLField('use_ssl_tcp', 'ssl_fields_tcp');
+            });
         });
+
 
         function deleterow(deleteButton) {
             let row = deleteButton.closest('.form-group');  // Find the closest form-group row
