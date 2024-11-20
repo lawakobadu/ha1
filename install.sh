@@ -4,9 +4,6 @@
 sudo mkdir -p /etc/haproxy-dashboard
 
 # Copy files to the 'haproxy-dashboard' folder
-
-# sudo cp -r __pycache__/ /etc/haproxy-dashboard/
-# sudo cp -r .venv/ /etc/haproxy-dashboard/
 sudo cp -r admin/ /etc/haproxy-dashboard/
 sudo cp -r openssl/ /etc/haproxy-dashboard/
 sudo cp -r ssl/ /etc/haproxy-dashboard/
@@ -39,3 +36,33 @@ sudo systemctl daemon-reload
 # Enable and start the service
 sudo systemctl enable haproxy-dashboard.service
 sudo systemctl start haproxy-dashboard.service
+
+# Add Default Configuration
+cat << EOF | sudo tee -a /etc/haproxy/haproxy.cfg
+
+listen stats
+        bind :9999
+        mode http
+        stats enable
+        stats hide-version
+        stats uri /stats
+        stats realm Haproxy\ Statistics
+
+frontend http-default
+        bind *:80
+        mode http
+        default_backend http-default
+
+frontend https-default
+        bind *:443 ssl crt /etc/haproxy-dashboard/ssl/
+        redirect scheme https code 301 if !{ ssl_fc }
+        mode http
+        default_backend http-default
+
+backend http-default
+        balance roundrobin
+        server arb 38.47.71.134:80 weight 1 check
+EOF
+
+# Restart HAProxy to apply changes
+sudo systemctl restart haproxy
