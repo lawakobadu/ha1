@@ -1,7 +1,7 @@
 <nav class="navbar col-lg-12 col-12 p-0 fixed-top d-flex flex-row">
     <div class="text-center navbar-brand-wrapper d-flex align-items-center justify-content-start">
-      <a class="navbar-brand brand-logo me-5" href="{{ url_for('home') }}"><img src="{{url_for('static', filename='images/mini_logo_haproxy_1.png')}}" class="me-2" alt="logo" /></a>
-      <a class="navbar-brand brand-logo-mini" href="{{ url_for('home') }}"><img src="{{url_for('static', filename='images/mini_logo_haproxy.png')}}" alt="logo" /></a>
+      <a class="navbar-brand brand-logo me-5" href="{{ url_for('haproxy.home') }}"><img src="{{url_for('static', filename='images/mini_logo_haproxy_1.png')}}" class="me-2" alt="logo" /></a>
+      <a class="navbar-brand brand-logo-mini" href="{{ url_for('haproxy.home') }}"><img src="{{url_for('static', filename='images/mini_logo_haproxy.png')}}" alt="logo" /></a>
     </div>
     <div class="navbar-menu-wrapper d-flex align-items-center justify-content-end">
       <button class="navbar-toggler navbar-toggler align-self-center" type="button" data-toggle="minimize">
@@ -55,7 +55,7 @@
             <img src="{{url_for('static', filename='images/profile.svg')}}" alt="profile" />
           </a>
           <div class="dropdown-menu dropdown-menu-right navbar-dropdown" aria-labelledby="profileDropdown">
-            <a class="dropdown-item" href="{{ url_for('reset_password') }}">
+            <a class="dropdown-item" href="{{ url_for('auth.reset_password') }}">
               <i class="ti-settings text-primary"></i> Change password </a>
             <a class="dropdown-item" href="/logout">
               <i class="ti-power-off text-primary"></i> Logout </a>
